@@ -1,3 +1,4 @@
+-- Natives
 util.require_natives("natives-1660775568")
 
 -- Auto Update

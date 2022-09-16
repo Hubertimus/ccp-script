@@ -2,7 +2,7 @@
 util.require_natives("natives-1660775568")
 
 -- Auto Update
-local auto_update_source_url = "https://raw.githubusercontent.com/Hubertimus/ccp-script/main/Zhong%20Xina%20CCP%20Removals.lua"
+local auto_update_source_url = "https://raw.githubusercontent.com/Hubertimus/ccp-script/main/Zhong-Xina-CCP-Removals.lua"
 local status, lib = pcall(require, "auto-updater")
 if not status then
     async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",

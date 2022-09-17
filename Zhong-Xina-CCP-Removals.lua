@@ -60,6 +60,8 @@ local JINX_KILL_GODMODER = "Jinx Script>Anti-Modder>Kill Godmode Player>Squish"
 
 ------------ Variables ------------
 
+NULL = 0
+
 local block_joins = false
 
 ------------ End Variables ------------
@@ -68,30 +70,20 @@ local block_joins = false
 
 
 
------------- Script Menu Setup ------------
-
--- Shortcut to Players Tab
-local players_tab = menu.ref_by_path("Players")
-menu.action(menu.my_root(), "Players Tab", {}, "Goes to players tab", function()
-    menu.trigger_command(players_tab)
-end)
-
--- Auto Block Join
-menu.toggle(menu.my_root(), "Auto Join Reaction", {}, "Automatically sets block join reaction when you kick/crash.", function (on, click_type)
-    block_joins = on
-end)
-
--- menu.toggle(menu.my_root(), "Auto Script Host", {"ccpautosh"}, "Automatically sets you as script host.", function(on, click_type)
---     if players.get_script_host() ~= players.user() then
---     end
--- end)
------------- End Script Menu Setup ------------
-
-
-
-
-
 ------------ Functions ------------
+
+-- Gets ID of who owns entity
+-- function NETWORK_GET_ENTITY_OWNER(entityHandle)
+--     native_invoker.begin_call()
+--     native_invoker.push_arg_pointer(entityHandle)
+--     native_invoker.end_call_2(0x426141162EBE5CDB)
+--     return native_invoker.get_return_value_int()
+-- end
+
+-- Check if the player is loaded in an online session
+local function is_connected()
+    return util.is_session_started() and not util.is_session_transition_active()
+end
 
 -- Adds Block Join reaction to player_id
 local function block_player(player_id, force)
@@ -255,6 +247,86 @@ On_join = function(player_id)
     end
 end
 ------------ End Functions ------------
+
+
+
+
+
+------------ Script Menu Setup ------------
+
+-- Shortcut to Players Tab
+menu.action(menu.my_root(), "Players Tab", {}, "Goes to players tab", function()
+    menu.trigger_command(menu.ref_by_path("Players"))
+end)
+
+-- Auto Block Join
+menu.toggle(menu.my_root(), "Auto Join Reaction", {}, "Automatically sets block join reaction when you kick/crash.", function (on, click_type)
+    block_joins = on
+end)
+
+local protections_tab = menu.list(menu.my_root(), "Protections")
+
+-- Anti Invisible Entity
+menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisible entities transparent instead.", function (on, click_type)
+    if is_connected() then
+        local invis_count = 0
+        for _, pointer in ipairs(entities.get_all_objects_as_pointers()) do
+            local net_object = memory.read_long(pointer + 0xD0)
+            if net_object == NULL or memory.read_byte(net_object + 0x49) == players.user() then
+                continue
+            end
+            local h_entity = entities.pointer_to_handle(pointer)
+
+            -- Ignore our own networked entities
+            if NETWORK.NETWORK_HAS_CONTROL_OF_ENTITY(h_entity) then
+                continue
+            end
+
+            if not ENTITY.IS_ENTITY_VISIBLE(h_entity) then
+                ENTITY.SET_ENTITY_VISIBLE(h_entity, true, false)
+                ENTITY.SET_ENTITY_ALPHA(h_entity, 55, false)
+                invis_count += 1
+            end
+        end
+
+        for _, h_vehicle in ipairs(entities.get_all_vehicles_as_handles()) do
+            -- Ignore our own networked entities
+            if NETWORK.NETWORK_HAS_CONTROL_OF_ENTITY(h_vehicle) then
+                continue
+            end
+
+            if not ENTITY.IS_ENTITY_VISIBLE(h_vehicle) then
+                ENTITY.SET_ENTITY_VISIBLE(h_vehicle, true, false)
+                ENTITY.SET_ENTITY_ALPHA(h_vehicle, 55, false)
+                invis_count += 1
+            end
+        end
+    end
+end)
+
+-- menu.toggle_loop(protections_tab, "Anti Vehicle Trolling", {}, "Removes any invisible entities in your vehicle.", function () 
+--     if is_connected() then
+--         local h_vehicle = entities.get_user_vehicle_as_handle()
+--         for i=-1, VEHICLE.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS(h_vehicle) - 1 do
+--             local h_ped = VEHICLE.GET_PED_IN_VEHICLE_SEAT(h_vehicle, i, false)
+
+--             if h_ped == NULL or h_ped == players.user_ped() or PED.IS_PED_A_PLAYER(h_ped) then
+--                 continue
+--             end
+
+--             if not NETWORK.NETWORK_HAS_CONTROL_OF_ENTITY(h_ped) then
+--                 entities.delete_by_handle(h_ped)
+--             end
+            
+--         end
+--     end
+-- end)
+
+-- menu.toggle(menu.my_root(), "Auto Script Host", {"ccpautosh"}, "Automatically sets you as script host.", function(on, click_type)
+--     if players.get_script_host() ~= players.user() then
+--     end
+-- end)
+------------ End Script Menu Setup ------------
 
 
 

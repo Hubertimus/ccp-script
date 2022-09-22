@@ -410,10 +410,12 @@ function()
 end,
 -- on_stop
 function ()
-    for _, player_id in ipairs(players.list(false, true, true)) do
-        if ghosted_table[player_id] then
-            NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, false)
-            ghosted_table[player_id] = false
+    if is_connected() then
+        for _, player_id in ipairs(players.list(false, true, true)) do
+            if ghosted_table[player_id] then
+                NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, false)
+                ghosted_table[player_id] = false
+            end
         end
     end
 end)

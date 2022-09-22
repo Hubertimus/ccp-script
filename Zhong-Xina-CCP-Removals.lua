@@ -50,6 +50,7 @@ local JS_ENTITY_STORM = "jsentitystorm"
 local JINX_LINUS_CRASH = "Jinx Script>Player Removals>Crashes>Linus Crash Tips"
 local JINX_GLITCH_PLAYER = "Jinx Script>Trolling & Griefing>Glitch Player>Glitch Player"
 local JINX_KILL_GODMODER = "Jinx Script>Anti-Modder>Kill Godmode Player>Squish"
+local JINX_REMOVE_GODMODE = "Jinx Script>Anti-Modder>Remove Player Godmode"
 
 ------------ End Commands ------------
 
@@ -85,6 +86,35 @@ local function is_connected()
     return util.is_session_started() and not util.is_session_transition_active()
 end
 
+-- Jinx Function
+local function player_toggle_loop(root, pid, menu_name, command_names, help_text, callback)
+    return menu.toggle_loop(root, menu_name, command_names, help_text, function()
+        if (not is_connected() or not players.exists(pid)) then util.stop_thread() end
+        callback()
+    end)
+end
+
+-- Jinx Function
+local function request_model(hash, timeout)
+    timeout = timeout or 3
+    STREAMING.REQUEST_MODEL(hash)
+    local end_time = os.time() + timeout
+    repeat
+        util.yield()
+    until STREAMING.HAS_MODEL_LOADED(hash) or os.time() >= end_time
+    return STREAMING.HAS_MODEL_LOADED(hash)
+end
+
+-- Jinx Function
+local function get_transition_state(pid)
+    return memory.read_int(memory.script_global(((0x2908D3 + 1) + (pid * 0x1C5)) + 230))
+end
+
+-- Jinx Function
+local function get_interior_player_is_in(pid)
+    return memory.read_int(memory.script_global(((0x2908D3 + 1) + (pid * 0x1C5)) + 243)) 
+end
+
 -- Adds Block Join reaction to player_id
 local function block_player(player_id, force)
     if (block_joins or force) and not table.contains(players.list(false, true, false), player_id) then
@@ -92,6 +122,31 @@ local function block_player(player_id, force)
 
         menu.trigger_commands(BLOCK_JOIN .. players.get_name(player_id))
     end
+end
+
+local function setup_utils(utils, player_id)
+    local player_root = menu.player_root(player_id)
+
+    -- Spectate Toggle Shortcut
+    menu.action(utils, "Toggle Spectate", {}, "Toggles Ninja Method Spectate", function ()
+        local cmd = menu.ref_by_rel_path(player_root, SPECTATE_NINJA)
+        menu.trigger_command(cmd, "")
+    end)
+
+    -- Teleport Shortcut
+    menu.action(utils, "Teleport to Player", {}, "Teleports", function ()
+        menu.trigger_commands(TELEPORT_TO .. players.get_name(player_id))
+    end)
+
+    -- Blacklist on Join
+    menu.action(utils, "Blacklist Player", {}, "", function()
+        block_player(player_id, true)
+    end)
+
+    -- Removals Shortcut
+    menu.action(utils, "Go To Removals", {}, "", function()
+        menu.trigger_command(menu.ref_by_rel_path(player_root, "Uyghur Muslim Removals"))
+    end)
 end
 
 -- Shortcuts to commonly used commands
@@ -116,7 +171,26 @@ local function setup_trolling(utils, player_id)
     menu.action(trolling, "Toggle Glitch Vehicle", {}, "", function()
         menu.trigger_commands(JINX_GLITCH_VEHICLE .. players.get_name(player_id))
     end)
+
+    -- Jinx Buggy Movement
+    player_toggle_loop(trolling, player_id, "Buggy Movement", {}, "", function()
+        local glitch_hash = util.joaat("prop_shuttering03")
+        request_model(glitch_hash)
+        local dumb_object_front = entities.create_object(glitch_hash, ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS(PLAYER.GET_PLAYER_PED(player_id), 0, 1, 0))
+        local dumb_object_back = entities.create_object(glitch_hash, ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS(PLAYER.GET_PLAYER_PED(player_id), 0, 0, 0))
+        ENTITY.SET_ENTITY_VISIBLE(dumb_object_front, false)
+        ENTITY.SET_ENTITY_VISIBLE(dumb_object_back, false)
+        util.yield()
+        entities.delete_by_handle(dumb_object_front)
+        entities.delete_by_handle(dumb_object_back)
+        util.yield()    
+    end)
+
     -- Remove God
+    menu.action(trolling, "Remove Godmode", {}, "", function ()
+        local cmd = menu.ref_by_rel_path(player_root, JINX_REMOVE_GODMODE)
+        menu.trigger_command(cmd)
+    end)
 
     -- Kill God Mode
     menu.action(trolling, "Kill Godmode Squish", {}, "", function()
@@ -173,11 +247,11 @@ local function setup_removals(player_id)
 
             menu.trigger_command(linus, "")
         else
-            local in_vehicle = players.get_vehicle_model(player_id) ~= 0
+            local in_vehicle = players.get_vehicle_model(player_id) ~= NULL
 
-            local crash_cmd = in_vehicle and VEHICLE_CRASH or ELEGANT_CRASH
+            local crash_cmd = in_vehicle ? VEHICLE_CRASH : ELEGANT_CRASH
 
-            local toast = (in_vehicle and "Vehicle Crashing " or "Crashing ") .. player_name 
+            local toast = (in_vehicle ? "Vehicle Crashing " : "Crashing ") .. player_name 
             
             util.toast(toast)
 
@@ -199,7 +273,7 @@ local function setup_removals(player_id)
             menu.trigger_commands(NEXT_GEN_CRASH .. player_name)
             menu.trigger_commands(BKFL_CRASH .. player_name)
 
-            if players.get_vehicle_model(player_id) ~= 0 then
+            if players.get_vehicle_model(player_id) ~= NULL then
                 menu.trigger_commands(VEHICLE_CRASH .. player_name)
             end
         end
@@ -225,21 +299,7 @@ On_join = function(player_id)
 
         local utils = menu.list(player_root, "Player Shortcuts")
 
-        -- Spectate Toggle Shortcut
-        menu.action(utils, "Toggle Spectate", {}, "Toggles Ninja Method Spectate", function ()
-            local cmd = menu.ref_by_rel_path(player_root, SPECTATE_NINJA)
-            menu.trigger_command(cmd, "")
-        end)
-
-        -- Teleport Shortcut
-        menu.action(utils, "Teleport to Player", {}, "Teleports", function ()
-            menu.trigger_commands(TELEPORT_TO .. players.get_name(player_id))
-        end)
-
-        -- Blacklist on Join
-        menu.action(utils, "Blacklist Player", {}, "", function()
-            block_player(player_id, true)
-        end)
+        setup_utils(utils, player_id)
 
         setup_trolling(utils, player_id)
 
@@ -301,6 +361,67 @@ menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisibl
                 invis_count += 1
             end
         end
+    end
+end)
+
+local interior_stuff = {0, 233985, 169473, 169729, 169985, 170241, 177665, 177409, 185089, 184833, 184577, 163585, 167425, 167169}
+
+local ghosted_table = {}
+
+-- Set everyone as not ghosted
+for i=0, 31 do
+    ghosted_table[i] = false
+end
+
+-- Set to false
+On_leave = function (player_id)
+    ghosted_table[player_id] = false
+end
+
+-- Auto Ghost Godemoder but better
+local ghost = false
+menu.toggle(protections_tab, "Auto Ghost Godmoders", {}, "Better than Jinx", function(toggle)
+    ghost = toggle
+
+    if not ghost then
+        for _, player_id in ipairs(players.list(false, true, true)) do
+            if ghosted_table[player_id] then
+                NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, false)
+                ghosted_table[player_id] = false
+            end
+        end
+        return
+    end
+
+    while ghost do
+        if not is_connected() then
+            continue
+        end
+
+        for _, player_id in ipairs(players.list(false, true, true)) do
+            local ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(player_id)
+            for i, interior in ipairs(interior_stuff) do
+                local is_ghosted = ghosted_table[player_id]
+
+                if (players.is_godmode(player_id) or not ENTITY.GET_ENTITY_CAN_BE_DAMAGED(ped)) then
+                    local should_be_vul = not NETWORK.NETWORK_IS_PLAYER_FADING(player_id) and ENTITY.IS_ENTITY_VISIBLE(ped) and get_transition_state(player_id) ~= 0 and get_interior_player_is_in(player_id) == interior
+                    if should_be_vul then
+                        NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, true)
+                        if not is_ghosted then
+                            ghosted_table[player_id] = true
+                            util.toast("Ghosted Godmoder " .. players.get_name(player_id))
+                        end
+                        break
+                    end
+                elseif is_ghosted then
+                    NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, false)
+                    ghosted_table[player_id] = false
+                    util.toast("Un-Ghosted " .. players.get_name(player_id))
+                end
+
+            end
+        end 
+        util.yield()
     end
 end)
 

@@ -379,25 +379,10 @@ On_leave = function (player_id)
 end
 
 -- Auto Ghost Godemoder but better
-local ghost = false
-menu.toggle(protections_tab, "Auto Ghost Godmoders", {}, "Better than Jinx", function(toggle)
-    ghost = toggle
-
-    if not ghost then
-        for _, player_id in ipairs(players.list(false, true, true)) do
-            if ghosted_table[player_id] then
-                NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, false)
-                ghosted_table[player_id] = false
-            end
-        end
-        return
-    end
-
-    while ghost do
-        if not is_connected() then
-            continue
-        end
-
+menu.toggle_loop(protections_tab, "Auto Ghost Godmoders", {}, "Better than Jinx", 
+-- on_tick
+function()
+    if is_connected() then
         for _, player_id in ipairs(players.list(false, true, true)) do
             local ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(player_id)
             for i, interior in ipairs(interior_stuff) do
@@ -421,7 +406,15 @@ menu.toggle(protections_tab, "Auto Ghost Godmoders", {}, "Better than Jinx", fun
 
             end
         end 
-        util.yield()
+    end
+end,
+-- on_stop
+function ()
+    for _, player_id in ipairs(players.list(false, true, true)) do
+        if ghosted_table[player_id] then
+            NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, false)
+            ghosted_table[player_id] = false
+        end
     end
 end)
 

@@ -394,14 +394,14 @@ function()
                         NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, true)
                         if not is_ghosted then
                             ghosted_table[player_id] = true
-                            util.toast("Ghosted Godmoder " .. players.get_name(player_id))
+                            -- util.toast("Ghosted Godmoder " .. players.get_name(player_id))
                         end
                         break
                     end
                 elseif is_ghosted then
                     NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, false)
                     ghosted_table[player_id] = false
-                    util.toast("Un-Ghosted " .. players.get_name(player_id))
+                    -- util.toast("Un-Ghosted " .. players.get_name(player_id))
                 end
 
             end

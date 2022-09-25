@@ -332,7 +332,10 @@ menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisibl
         local invis_count = 0
         for _, pointer in ipairs(entities.get_all_objects_as_pointers()) do
             local net_object = memory.read_long(pointer + 0xD0)
-            if net_object == NULL or memory.read_byte(net_object + 0x49) == players.user() then
+
+            local owner_id = net_object ~= NULL and memory.read_byte(net_object + 0x49) or -1
+
+            if net_object == NULL or owner_id == players.user() then
                 continue
             end
             local h_entity = entities.pointer_to_handle(pointer)
@@ -345,6 +348,15 @@ menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisibl
             if not ENTITY.IS_ENTITY_VISIBLE(h_entity) then
                 ENTITY.SET_ENTITY_VISIBLE(h_entity, true, false)
                 ENTITY.SET_ENTITY_ALPHA(h_entity, 55, false)
+                ENTITY.SET_ENTITY_COMPLETELY_DISABLE_COLLISION(h_entity, true, false)
+
+                if ENTITY.IS_ENTITY_TOUCHING_ENTITY(players.user(), h_entity) then
+                    entities.delete_by_handle(h_entity)
+                end
+
+                if owner_id ~= -1 then
+                    util.toast("Invisible Object from " .. players.get_name(owner_id))
+                end
                 invis_count += 1
             end
         end
@@ -358,6 +370,18 @@ menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisibl
             if not ENTITY.IS_ENTITY_VISIBLE(h_vehicle) then
                 ENTITY.SET_ENTITY_VISIBLE(h_vehicle, true, false)
                 ENTITY.SET_ENTITY_ALPHA(h_vehicle, 55, false)
+                ENTITY.SET_ENTITY_COMPLETELY_DISABLE_COLLISION(h_vehicle, true, false)
+
+                if ENTITY.IS_ENTITY_TOUCHING_ENTITY(players.user(), h_vehicle) then
+                    entities.delete_by_handle(h_vehicle)
+                end
+
+                local net_object = memory.read_long(entities.handle_to_pointer(h_vehicle) + 0xD0)
+                local owner_id = net_object ~= NULL and memory.read_byte(net_object + 0x49) or -1
+
+                if owner_id ~= -1 then
+                    util.toast("Invisible Vehicle from " .. players.get_name(owner_id))
+                end
                 invis_count += 1
             end
         end
@@ -450,6 +474,7 @@ end)
 
 -- Register callback
 players.on_join(On_join)
+players.on_leave(On_leave)
 players.dispatch_on_join()
 
 -- Keep script from closing immediately

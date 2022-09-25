@@ -31,7 +31,7 @@ local ULTIMATE = 3
 
 -- Stand Commands
 local SMART_KICK = "kick"
-local BREAKDOWN_KICK = "breakdown"
+local BREAKUP_KICK = "breakup"
 local ELEGANT_CRASH = "crash"
 local NEXT_GEN_CRASH = "ngcrash"
 local BKFL_CRASH = "footlettuce"
@@ -223,11 +223,11 @@ local function setup_removals(player_id)
 
     local root = menu.list(player_root, "Uyghur Muslim Removals")
 
-    -- Add the option to explicitly Breakdown Kick
+    -- Add the option to explicitly Breakup Kick
     if not is_broke then
-        menu.action(root, "Breakdown Kick", {}, "You're not broke!", function() 
+        menu.action(root, "Breakup Kick", {}, "You're not broke!", function() 
             block_player(player_id, false)
-            menu.trigger_commands(BREAKDOWN_KICK .. players.get_name(player_id))
+            menu.trigger_commands(BREAKUP_KICK .. players.get_name(player_id))
         end)
     end
 

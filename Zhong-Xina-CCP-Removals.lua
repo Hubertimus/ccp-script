@@ -1,6 +1,8 @@
 -- Natives
 util.require_natives("natives-1660775568")
 
+-- TODO: Move all player iterations to a single iterator
+
 -- Auto Update
 local auto_update_source_url = "https://raw.githubusercontent.com/Hubertimus/ccp-script/main/Zhong-Xina-CCP-Removals.lua"
 local status, lib = pcall(require, "auto-updater")
@@ -52,6 +54,8 @@ local JINX_GLITCH_PLAYER = "Jinx Script>Trolling & Griefing>Glitch Player>Glitch
 local JINX_KILL_GODMODER = "Jinx Script>Anti-Modder>Kill Godmode Player>Squish"
 local JINX_REMOVE_GODMODE = "Jinx Script>Anti-Modder>Remove Player Godmode"
 
+local WIRI_HOSTILE_CARS = "Trolling & Griefing>Hostile "
+
 ------------ End Commands ------------
 
 
@@ -65,6 +69,29 @@ NULL = 0
 
 local block_joins = false
 
+-- Jinx
+local interior_stuff = {0, 233985, 169473, 169729, 169985, 170241, 177665, 177409, 185089, 184833, 184577, 163585, 167425, 167169}
+
+local ghosted_table = {}
+
+local xenophobia_enabled
+
+local languages = {
+    [0] = { lang = "English", block = false },
+    [1] = { lang = "French", block = false },
+    [2] = { lang = "German", block = false },
+    [3] = { lang = "Italian", block = false },
+    [4] = { lang = "Spanish", block = false },
+    [5] = { lang = "Brazilian", block = true },
+    [6] = { lang = "Polish", block = true },
+    [7] = { lang = "Russian", block = true },
+    [8] = { lang = "Korean", block = false },
+    [9] = { lang = "Chinese (Traditional)", block = true },
+    [10] = { lang = "Japanese", block = false },
+    [11] = { lang = "Mexican", block = false },
+    [12] = { lang = "Chinese (Simplified)", block = true }
+}
+
 ------------ End Variables ------------
 
 
@@ -74,12 +101,15 @@ local block_joins = false
 ------------ Functions ------------
 
 -- Gets ID of who owns entity
--- function NETWORK_GET_ENTITY_OWNER(entityHandle)
---     native_invoker.begin_call()
---     native_invoker.push_arg_pointer(entityHandle)
---     native_invoker.end_call_2(0x426141162EBE5CDB)
---     return native_invoker.get_return_value_int()
--- end
+local function entity_owner_from_pointer(entityPointer)
+    local net_object = memory.read_long(entityPointer + 0xD0)
+    local owner_id = net_object ~= NULL and memory.read_byte(net_object + 0x49) or -1
+    return owner_id
+end
+
+local function get_entity_owner(entityHandle)
+    return entity_owner_from_pointer(entities.handle_to_pointer(entityHandle))
+end
 
 -- Check if the player is loaded in an online session
 local function is_connected()
@@ -186,6 +216,11 @@ local function setup_trolling(utils, player_id)
         util.yield()    
     end)
 
+    -- Entity Storm
+    menu.action(trolling, "Toggle Entity Storm", {}, "", function()
+        menu.trigger_commands(JINX_GLITCH_VEHICLE .. players.get_name(player_id))
+    end)
+
     -- Remove God
     menu.action(trolling, "Remove Godmode", {}, "", function ()
         local cmd = menu.ref_by_rel_path(player_root, JINX_REMOVE_GODMODE)
@@ -288,6 +323,16 @@ local function setup_removals(player_id)
     end)
 end
 
+local function handle_xenophobia(player_id)
+    local lang = languages[players.get_language(player_id)]
+    if xenophobia_enabled and lang.block then
+        local name = players.get_name(player_id)
+        util.toast("Kicking " .. lang.lang .. " Player " .. name)
+        block_player(player_id, false)
+        menu.trigger_commands(SMART_KICK .. name)
+    end
+end
+
 -- on_join callback
 On_join = function(player_id)
     -- If not ourselves, construct options
@@ -329,15 +374,13 @@ local protections_tab = menu.list(menu.my_root(), "Protections")
 -- Anti Invisible Entity
 menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisible entities transparent instead.", function (on, click_type)
     if is_connected() then
-        local invis_count = 0
         for _, pointer in ipairs(entities.get_all_objects_as_pointers()) do
-            local net_object = memory.read_long(pointer + 0xD0)
+            local owner_id = entity_owner_from_pointer(pointer)
 
-            local owner_id = net_object ~= NULL and memory.read_byte(net_object + 0x49) or -1
-
-            if net_object == NULL or owner_id == players.user() then
+            if owner_id == -1 or owner_id == players.user() then
                 continue
             end
+
             local h_entity = entities.pointer_to_handle(pointer)
 
             -- Ignore our own networked entities
@@ -357,13 +400,14 @@ menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisibl
                 if owner_id ~= -1 then
                     util.toast("Invisible Object from " .. players.get_name(owner_id))
                 end
-                invis_count += 1
             end
         end
 
         for _, h_vehicle in ipairs(entities.get_all_vehicles_as_handles()) do
             -- Ignore our own networked entities
-            if NETWORK.NETWORK_HAS_CONTROL_OF_ENTITY(h_vehicle) then
+            local owner_id = get_entity_owner(h_vehicle)
+
+            if  owner_id == -1 or owner_id == players.user() or NETWORK.NETWORK_HAS_CONTROL_OF_ENTITY(h_vehicle) then
                 continue
             end
 
@@ -376,21 +420,13 @@ menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisibl
                     entities.delete_by_handle(h_vehicle)
                 end
 
-                local net_object = memory.read_long(entities.handle_to_pointer(h_vehicle) + 0xD0)
-                local owner_id = net_object ~= NULL and memory.read_byte(net_object + 0x49) or -1
-
                 if owner_id ~= -1 then
                     util.toast("Invisible Vehicle from " .. players.get_name(owner_id))
                 end
-                invis_count += 1
             end
         end
     end
 end)
-
-local interior_stuff = {0, 233985, 169473, 169729, 169985, 170241, 177665, 177409, 185089, 184833, 184577, 163585, 167425, 167169}
-
-local ghosted_table = {}
 
 -- Set everyone as not ghosted
 for i=0, 31 do
@@ -443,6 +479,42 @@ function ()
         end
     end
 end)
+
+-- local xenophobia_list = false
+
+-- local function setup_xenophobia()
+--     xenophobia_list = menu.list(menu.my_root(), "Kick Languages")
+--     for i, v in ipairs(languages) do
+--         menu.toggle(xenophobia_list, v.lang, {}, "", function(enabled)
+--             languages[i].block = enabled
+--         end, v.block)
+--     end
+
+--     util.create_thread(function ()
+--         if is_connected() and xenophobia_enabled then
+--             for _, player_id in ipairs(players.list(false, false, true)) do
+--                 handle_xenophobia(player_id)
+--             end
+--             util.yield(100)
+--         else
+--             return
+--         end
+--         -- Execute 10 times/sec
+--     end)
+-- end
+
+-- -- Xenophobia Setup
+-- menu.toggle(menu.my_root(), "Xenophobia", {}, "Kicks Players based off of Language settings\n(On Join)", function(enabled)
+--     xenophobia_enabled = enabled
+
+--     if xenophobia_enabled then
+--         setup_xenophobia()
+--     else
+--         if xenophobia_list ~= NULL then
+--             menu.delete(xenophobia_list)
+--         end
+--     end
+-- end)
 
 -- menu.toggle_loop(protections_tab, "Anti Vehicle Trolling", {}, "Removes any invisible entities in your vehicle.", function () 
 --     if is_connected() then

@@ -249,14 +249,14 @@ local function setup_removals(anchor, player_id)
     -- Check if the user is Zack
     local is_broke = menu.get_edition() < REGULAR
 
-    local player_root = menu.shadow_root()
-    
+    local player_root = menu.player_root(player_id)
+
     -- Check if Jinx Script Linus crash exists
     local linus_exists, linus = pcall(function()
         return menu.ref_by_rel_path(player_root, JINX_LINUS_CRASH)
     end)
 
-    local root = menu.attach_before(anchor, menu.list(player_root, "Uyghur Muslim Removals"))
+    local root = menu.attach_before(anchor, menu.list(menu.shadow_root(), "Uyghur Muslim Removals"))
 
     -- Add the option to explicitly Breakup Kick
     if not is_broke then

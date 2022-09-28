@@ -245,18 +245,18 @@ local function setup_trolling(utils, player_id)
 end
 
 -- Shortcuts to player removals
-local function setup_removals(player_id)
+local function setup_removals(anchor, player_id)
     -- Check if the user is Zack
     local is_broke = menu.get_edition() < REGULAR
 
-    local player_root = menu.player_root(player_id)
+    local player_root = menu.shadow_root()
     
     -- Check if Jinx Script Linus crash exists
     local linus_exists, linus = pcall(function()
         return menu.ref_by_rel_path(player_root, JINX_LINUS_CRASH)
     end)
 
-    local root = menu.list(player_root, "Uyghur Muslim Removals")
+    local root = menu.attach_before(anchor, menu.list(player_root, "Uyghur Muslim Removals"))
 
     -- Add the option to explicitly Breakup Kick
     if not is_broke then
@@ -339,16 +339,19 @@ On_join = function(player_id)
     if player_id ~= players.user() then
         local player_root = menu.player_root(player_id)
 
-        -- Create a Divider
-        menu.divider(player_root, "Zhong Xina CCP Removals")
+        local shadow_root = menu.shadow_root()
 
-        local utils = menu.list(player_root, "Player Shortcuts")
+        -- Create a Divider
+        local anchor = menu.ref_by_rel_path(player_root, "Information")
+
+        local utils = menu.list(shadow_root, "Player Shortcuts")
+        utils = menu.attach_before(anchor, utils)
 
         setup_utils(utils, player_id)
 
         setup_trolling(utils, player_id)
 
-        setup_removals(player_id)
+        setup_removals(anchor, player_id)
     end
 end
 ------------ End Functions ------------

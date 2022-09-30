@@ -65,7 +65,11 @@ local WIRI_HOSTILE_CARS = "Trolling & Griefing>Hostile "
 
 ------------ Variables ------------
 
+local WEAPON_STUNGUN <const> = 1171102963
+local WEAPON_RAYPISTOL <const> = -1355376991
 NULL = 0
+
+local shadow_root = menu.shadow_root()
 
 local block_joins = false
 
@@ -91,6 +95,11 @@ local languages = {
     [11] = { lang = "Mexican", block = false },
     [12] = { lang = "Chinese (Simplified)", block = true }
 }
+
+local show_notification = false
+local anti_stun_gun = false
+local anti_atomizer = false
+local in_timeout = {}
 
 ------------ End Variables ------------
 
@@ -154,6 +163,22 @@ local function block_player(player_id, force)
     end
 end
 
+-- Checks if you're aiming at an entity
+local function is_aiming_at_entity(player_id, target_entity, player_entity, optional_fov)
+	if player_entity and optional_fov then
+		return PLAYER.IS_PLAYER_FREE_AIMING(player_id) and PED.IS_PED_FACING_PED(player_entity, target_entity, optional_fov)
+	else
+		return PLAYER.IS_PLAYER_FREE_AIMING_AT_ENTITY(player_id, target_entity)
+	end
+end
+
+local function toast(...)
+	if show_notification then
+		return util.toast(...)
+	end
+end
+
+-- Script Setup Functions
 local function setup_utils(utils, player_id)
     local player_root = menu.player_root(player_id)
 
@@ -171,6 +196,11 @@ local function setup_utils(utils, player_id)
     -- Blacklist on Join
     menu.action(utils, "Blacklist Player", {}, "", function()
         block_player(player_id, true)
+    end)
+
+    menu.action(utils, "Remove Ghost", {}, "", function ()
+        NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, false)
+        ghosted_table[player_id] = false
     end)
 
     -- Removals Shortcut
@@ -252,11 +282,7 @@ local function setup_removals(anchor, player_id)
     local player_root = menu.player_root(player_id)
 
     -- Check if Jinx Script Linus crash exists
-    local linus_exists, linus = pcall(function()
-        return menu.ref_by_rel_path(player_root, JINX_LINUS_CRASH)
-    end)
-
-    local root = menu.attach_before(anchor, menu.list(menu.shadow_root(), "Uyghur Muslim Removals"))
+    local root = menu.attach_before(anchor, menu.list(shadow_root, "Uyghur Muslim Removals"))
 
     -- Add the option to explicitly Breakup Kick
     if not is_broke then
@@ -276,6 +302,10 @@ local function setup_removals(anchor, player_id)
     menu.action(root, "Smart Crash", {}, "Uses Vehicle Manslaughter if they are in a vehicle.", function ()
         local player_name = players.get_name(player_id)
         block_player(player_id, false)
+
+        -- Check if ref exists
+        local linus = menu.ref_by_rel_path(player_root, JINX_LINUS_CRASH)
+        local linus_exists = linus:isValid()
 
         if linus_exists then
             util.toast("Linus Crashing " .. player_name)
@@ -299,6 +329,10 @@ local function setup_removals(anchor, player_id)
         local player_name = players.get_name(player_id)
         util.toast("Attempting to remove " .. player_name)
         block_player(player_id, true)
+
+        -- Check if ref exists
+        local linus = menu.ref_by_rel_path(player_root, JINX_LINUS_CRASH)
+        local linus_exists = linus:isValid()
 
         -- Use best crash commands
         if linus_exists then
@@ -338,8 +372,6 @@ On_join = function(player_id)
     -- If not ourselves, construct options
     if player_id ~= players.user() then
         local player_root = menu.player_root(player_id)
-
-        local shadow_root = menu.shadow_root()
 
         -- Create a Divider
         local anchor = menu.ref_by_rel_path(player_root, "Information")
@@ -481,6 +513,75 @@ function ()
             end
         end
     end
+end)
+
+-- Zack Moment
+local anti_taser = menu.list(protections_tab, "Anti Stunomizer")
+
+menu.toggle(anti_taser, "Show Notification", {}, "Shows notification of when the player gets event blocked", function(state)
+	show_notification = state
+end)
+
+menu.toggle(anti_taser, "Anti Stun Gun", {"antitaser"}, "Stops players from stunning you with the stun gun", function(state)
+	anti_stun_gun = state
+end)
+
+menu.toggle(anti_taser, "Anti Up-N-Atomizer", {"antiupnatomizer"}, "Stops players from shooting you with the Up-N-Atomizer", function(state)
+	anti_atomizer = state
+end)
+
+menu.toggle_loop(anti_taser, "Enable", {}, "", function()
+	if not anti_stun_gun and not anti_atomizer then
+		return -- If you don't have the features enabled, stop here
+	end
+
+	local lp_id = players.user()
+	local lp_ped = players.user_ped()
+	local lp_pos = players.get_position(lp_id)
+
+	for _, player_id in players.list(false) do
+		local player_ped = PLAYER.GET_PLAYER_PED(player_id)
+		local player_name = players.get_name(player_id)
+
+		if in_timeout[player_name] then
+			continue
+		end
+
+		-- Get the hash of the player's current weapon
+		local current_weapon = WEAPON.GET_SELECTED_PED_WEAPON(player_ped)
+
+		if anti_stun_gun and current_weapon == WEAPON_STUNGUN then
+			if not is_aiming_at_entity(player_id, lp_ped) then
+				continue
+			end
+
+		elseif anti_atomizer and current_weapon == WEAPON_RAYPISTOL then
+			if not is_aiming_at_entity(player_id, lp_ped, player_ped, 10) then
+				continue
+			end
+		else
+			continue
+		end
+
+		local player_pos = players.get_position(player_id)
+		local distance = player_pos:distance(lp_pos)
+		local timeout_delay = 200 + math.floor(distance * 0.015 * 1000) -- if dist is 13.4128, timeout length = 401ms
+
+		in_timeout[player_name] = 1
+		menu.trigger_commands("ignore" .. player_name .. " on")
+		toast("Ignoring network events from: " .. player_name .. " for " .. timeout_delay .. "ms")
+
+		util.create_thread(function()
+			util.yield(timeout_delay)
+			menu.trigger_commands("ignore" .. player_name .. " off")
+			in_timeout[player_name] = nil
+		end)
+	end
+
+	if PED.IS_PED_BEING_STUNNED(lp_ped, 0) then
+		TASK.CLEAR_PED_TASKS_IMMEDIATELY(lp_ped)
+		util.toast("You are getting stunned lmao")
+	end
 end)
 
 -- local xenophobia_list = false

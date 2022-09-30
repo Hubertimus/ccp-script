@@ -376,14 +376,14 @@ On_join = function(player_id)
         -- Create a Divider
         local anchor = menu.ref_by_rel_path(player_root, "Information")
 
+        setup_removals(anchor, player_id)
+
         local utils = menu.list(shadow_root, "Player Shortcuts")
         utils = menu.attach_before(anchor, utils)
 
         setup_utils(utils, player_id)
 
         setup_trolling(utils, player_id)
-
-        setup_removals(anchor, player_id)
     end
 end
 ------------ End Functions ------------

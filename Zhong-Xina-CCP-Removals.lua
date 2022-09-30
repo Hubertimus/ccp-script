@@ -246,9 +246,9 @@ local function setup_trolling(utils, player_id)
         util.yield()    
     end)
 
-    -- Entity Storm
-    menu.action(trolling, "Toggle Entity Storm", {}, "", function()
-        menu.trigger_commands(JINX_GLITCH_VEHICLE .. players.get_name(player_id))
+    -- Hostile Cars
+    menu.action(trolling, "Toggle Hostile Cars", {}, "", function()
+        menu.trigger_commands(WIRI_HOSTILE_CARS .. players.get_name(player_id))
     end)
 
     -- Remove God

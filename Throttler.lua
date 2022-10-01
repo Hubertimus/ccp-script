@@ -1,6 +1,22 @@
 -- Natives
 util.require_natives("natives-1663599433")
 
+-- Auto Update
+local auto_update_source_url = "https://raw.githubusercontent.com/Hubertimus/ccp-script/main/Throttler.lua"
+local status, lib = pcall(require, "auto-updater")
+if not status then
+    async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",
+        function(result, headers, status_code) local error_prefix = "Error downloading auto-updater: "
+            if status_code ~= 200 then util.toast(error_prefix..status_code) return false end
+            if not result or result == "" then util.toast(error_prefix.."Found empty file.") return false end
+            local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
+            if file == nil then util.toast(error_prefix.."Could not open file for writing.") return false end
+            file:write(result) file:close() util.toast("Successfully installed auto-updater lib")
+        end, function() util.toast("Error downloading auto-updater lib. Update failed to download.") end)
+    async_http.dispatch() util.yield(3000) require("auto-updater")
+end
+run_auto_update({source_url=auto_update_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
+
 ------------------- Queue Stuff
 -- Queue Linked List
 Queue = {}

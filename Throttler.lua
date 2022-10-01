@@ -354,33 +354,8 @@ for type=0, 2 do
             util.create_tick_handler(function ()
                 if is_focused then
                     local r = config.radius
-            
-                    local factor = 10
-            
-                    for i=1, 360 / factor do
-                        local cos = math.cos(math.rad(i * factor))
-                        local sin = math.sin(math.rad(i * factor))
-                
-                        local startX = r * cos
-                        local startY = r * sin
-                
-                        local pedpos = ENTITY.GET_ENTITY_COORDS(players.user_ped())
-                
-                        local pos1 = v3.new(pedpos.x + startX, pedpos.y + startY, pedpos.z - 1)
-                
-                        local cos2 = math.cos(math.rad((i + 1) * factor))
-                        local sin2 = math.sin(math.rad((i + 1) * factor))
-                
-                        local endX = r * cos2
-                        local endY = r * sin2
-                
-                        local dx = startX - endX
-                        local dy = startY - endY
-                
-                        local length = math.sqrt(dx * dx + dy * dy)
-                
-                        util.draw_box(pos1, v3.new(0,0,90 + (i * factor)), v3.new(length,0,30), 255, 0, 0, 100)
-                    end
+                    local pos = players.get_position(players.user())
+                    GRAPHICS.DRAW_MARKER_SPHERE(pos.x, pos.y, pos.z, r, 255, 255, 255, 0.3)
                 else return false
                 end
             end)

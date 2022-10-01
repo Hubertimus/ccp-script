@@ -154,6 +154,26 @@ local function get_interior_player_is_in(pid)
     return memory.read_int(memory.script_global(((0x2908D3 + 1) + (pid * 0x1C5)) + 243)) 
 end
 
+-- Jinx Linus Crash Tips
+local function linux_crash_tips(pid)
+    local int_min = -2147483647
+    local int_max = 2147483647
+    for i = 1, 150 do
+        util.trigger_script_event(1 << pid, {2765370640, pid, 3747643341, math.random(int_min, int_max), math.random(int_min, int_max), 
+        math.random(int_min, int_max), math.random(int_min, int_max), math.random(int_min, int_max), math.random(int_min, int_max),
+        math.random(int_min, int_max), pid, math.random(int_min, int_max), math.random(int_min, int_max), math.random(int_min, int_max)})
+    end
+    util.yield()
+    for i = 1, 15 do
+        util.trigger_script_event(1 << pid, {1348481963, pid, math.random(int_min, int_max)})
+    end
+    menu.trigger_commands("givesh " .. players.get_name(pid))
+    util.yield(100)
+    util.trigger_script_event(1 << pid, {495813132, pid, 0, 0, -12988, -99097, 0})
+    util.trigger_script_event(1 << pid, {495813132, pid, -4640169, 0, 0, 0, -36565476, -53105203})
+    util.trigger_script_event(1 << pid, {495813132, pid,  0, 1, 23135423, 3, 3, 4, 827870001, 5, 2022580431, 6, -918761645, 7, 1754244778, 8, 827870001, 9, 17})
+end
+
 -- Adds Block Join reaction to player_id
 local function block_player(player_id, force)
     if (block_joins or force) and not table.contains(players.list(false, true, false), player_id) then
@@ -304,25 +324,21 @@ local function setup_removals(anchor, player_id)
         local player_name = players.get_name(player_id)
         block_player(player_id, false)
 
-        -- Check if ref exists
-        local linus = menu.ref_by_rel_path(player_root, JINX_LINUS_CRASH)
-        local linus_exists = linus:isValid()
+        linux_crash_tips(player_id)
+        local in_vehicle = players.get_vehicle_model(player_id) ~= NULL
 
-        if linus_exists then
-            util.toast("Linus Crashing " .. player_name)
+        local crash_cmd = in_vehicle ? VEHICLE_CRASH : ELEGANT_CRASH
 
-            menu.trigger_command(linus, "")
-        else
-            local in_vehicle = players.get_vehicle_model(player_id) ~= NULL
+        local toast = (in_vehicle ? "Vehicle Crashing " : "Crashing ") .. player_name 
+        
+        util.toast(toast)
 
-            local crash_cmd = in_vehicle ? VEHICLE_CRASH : ELEGANT_CRASH
+        menu.trigger_commands(crash_cmd .. player_name)
+    end)
 
-            local toast = (in_vehicle ? "Vehicle Crashing " : "Crashing ") .. player_name 
-            
-            util.toast(toast)
-
-            menu.trigger_commands(crash_cmd .. player_name)
-        end
+    -- Jinx Linus Crash
+    menu.action(root, "Linus Crash", {}, "", function ()
+        linux_crash_tips(player_id)
     end)
 
     -- Crash then Kick the player to guarantee removal
@@ -331,21 +347,13 @@ local function setup_removals(anchor, player_id)
         util.toast("Attempting to remove " .. player_name)
         block_player(player_id, true)
 
-        -- Check if ref exists
-        local linus = menu.ref_by_rel_path(player_root, JINX_LINUS_CRASH)
-        local linus_exists = linus:isValid()
+        linux_crash_tips(player_id)
+        menu.trigger_commands(ELEGANT_CRASH .. player_name)
+        menu.trigger_commands(NEXT_GEN_CRASH .. player_name)
+        menu.trigger_commands(BKFL_CRASH .. player_name)
 
-        -- Use best crash commands
-        if linus_exists then
-            menu.trigger_command(linus, "")
-        else 
-            menu.trigger_commands(ELEGANT_CRASH .. player_name)
-            menu.trigger_commands(NEXT_GEN_CRASH .. player_name)
-            menu.trigger_commands(BKFL_CRASH .. player_name)
-
-            if players.get_vehicle_model(player_id) ~= NULL then
-                menu.trigger_commands(VEHICLE_CRASH .. player_name)
-            end
+        if players.get_vehicle_model(player_id) ~= NULL then
+            menu.trigger_commands(VEHICLE_CRASH .. player_name)
         end
 
         util.yield(4000)

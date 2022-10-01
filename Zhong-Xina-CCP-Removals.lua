@@ -54,7 +54,7 @@ local JINX_GLITCH_PLAYER = "Jinx Script>Trolling & Griefing>Glitch Player>Glitch
 local JINX_KILL_GODMODER = "Jinx Script>Anti-Modder>Kill Godmode Player>Squish"
 local JINX_REMOVE_GODMODE = "Jinx Script>Anti-Modder>Remove Player Godmode"
 
-local WIRI_HOSTILE_CARS = "Trolling & Griefing>Hostile "
+local WIRI_HOSTILE_CARS = "Trolling & Griefing>Hostile Traffic"
 
 ------------ End Commands ------------
 
@@ -248,7 +248,8 @@ local function setup_trolling(utils, player_id)
 
     -- Hostile Cars
     menu.action(trolling, "Toggle Hostile Cars", {}, "", function()
-        menu.trigger_commands(WIRI_HOSTILE_CARS .. players.get_name(player_id))
+        local cmd = menu.ref_by_rel_path(player_root, WIRI_HOSTILE_CARS)
+        menu.trigger_command(cmd, "")
     end)
 
     -- Remove God

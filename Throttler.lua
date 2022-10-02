@@ -328,7 +328,7 @@ function ()
 
     check_list(objects_list, now, 0)
     check_list(ped_list, now, 1)
-    check_list(veh_p_list, now, 2)
+    check_list(veh_p_list, now, 2, veh_list)
 
     cleanup_seen(objects_list, ped_list, veh_p_list)
 

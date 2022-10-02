@@ -1,6 +1,8 @@
 -- Natives
 util.require_natives("natives-1660775568")
 
+-- Version 2.0
+
 -- TODO: Move all player iterations to a single iterator
 
 -- Auto Update

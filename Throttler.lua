@@ -1,6 +1,8 @@
 -- Natives
 util.require_natives("natives-1663599433")
 
+-- Version 1.0
+
 -- Auto Update
 local auto_update_source_url = "https://raw.githubusercontent.com/Hubertimus/ccp-script/main/Throttler.lua"
 local status, lib = pcall(require, "auto-updater")

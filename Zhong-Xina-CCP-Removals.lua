@@ -396,6 +396,8 @@ On_join = function(player_id)
         setup_utils(utils, player_id)
 
         setup_trolling(utils, player_id)
+
+        menu.attach_before(anchor, menu.divider(shadow_root, "Player Options"))
     end
 end
 ------------ End Functions ------------

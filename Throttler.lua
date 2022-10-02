@@ -147,7 +147,7 @@ local function block_syncs(pid, should_block)
     menu.trigger_commands(BLOCK_CMD .. players.get_name(pid) .. (should_block ? " on" : " off"))
 end
 
-local function check_list(entities_list, now, type, handles)
+local function check_list(entities_list, now, type, veh_list)
     local can_track = now - last_ran_ms > 5000
 
     local player = players.user()
@@ -155,20 +155,13 @@ local function check_list(entities_list, now, type, handles)
     local pos = players.get_position(players.user())
 
     -- Check for all vehicles made by player
-    for _, ent in ipairs(entities_list) do
-        local obj_ptr = handles ? entities.handle_to_pointer(ent) : ent
+    for i, ent in ipairs(entities_list) do
+        local obj_ptr = ent
 
         -- Check if we own object
         local owner_id = entity_owner_from_pointer(obj_ptr)
 
         if owner_id == -1 or owner_id == player then
-            continue
-        end
-
-        local obj_handle = handles ? ent : entities.pointer_to_handle(obj_ptr)
-
-        -- Ignore player model
-        if obj_handle == PLAYER.GET_PLAYER_PED(owner_id) then
             continue
         end
 
@@ -181,8 +174,9 @@ local function check_list(entities_list, now, type, handles)
 
                 if type == 2 then
                     local has_ped = false
-                    for i=-1, VEHICLE.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS(obj_handle) - 1 do
-                        if VEHICLE.GET_PED_IN_VEHICLE_SEAT(obj_handle, i, false) ~= 0 then
+                    local handle = veh_list[i]
+                    for i=-1, VEHICLE.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS(handle) - 1 do
+                        if VEHICLE.GET_PED_IN_VEHICLE_SEAT(handle, i, false) ~= 0 then
                             has_ped = true
                         end
                     end
@@ -202,6 +196,7 @@ local function check_list(entities_list, now, type, handles)
                 Queue.push(q, node)
             end
         end
+
     end
 end
 
@@ -210,10 +205,7 @@ local function cleanup_seen(obj_list, ped_list, veh_list)
 
     -- Cache indexes of old entities
     for i, pointer in ipairs(seen_entities) do
-
-        local obj_handle = entities.pointer_to_handle(pointer)
-
-        if table.contains(obj_list, pointer) or table.contains(ped_list, pointer) or table.contains(veh_list, obj_handle) then
+        if table.contains(obj_list, pointer) or table.contains(ped_list, pointer) or table.contains(veh_list, pointer) then
             continue
         end
 
@@ -304,7 +296,7 @@ end
 
 
 ------------ Menu Setup ------------ 
-menu.toggle_loop(menu.my_root(), "Throttle Objects", {}, "Throttles Objects owned by other players.", 
+menu.toggle_loop(menu.my_root(), "Enable Throttler", {}, "Throttles Objects owned by other players.", 
 function ()
     -- Check if we're online and connected
     if not is_connected() then 
@@ -328,25 +320,32 @@ function ()
     local ped_list = entities.get_all_peds_as_pointers()
     local veh_list = entities.get_all_vehicles_as_handles()
 
-    -- 5 Second Grace Period
+    local veh_p_list = {}
+
+    for i, veh in ipairs(veh_list) do
+        veh_p_list[i] = entities.handle_to_pointer(veh)
+    end
+
     check_list(objects_list, now, 0)
     check_list(ped_list, now, 1)
-    check_list(veh_list, now, 2, true)
+    check_list(veh_p_list, now, 2)
 
-    cleanup_seen(objects_list, ped_list, veh_list)
+    cleanup_seen(objects_list, ped_list, veh_p_list)
 
     -- Go through player Entity Queues
     check_queue(now)
 end, 
 function()
-    seen_entities = {}
-    for i=0, 31 do
-        local p_throttler = throttler_list[i]
-        Queue.clear(p_throttler.objq)
-        Queue.clear(p_throttler.pedq)
-        Queue.clear(p_throttler.vehq)
-        p_throttler.throttling = false
-        p_throttler.throttle_time = 0
+    if #seen_entities > 0 then
+        seen_entities = {}
+        for i=0, 31 do
+            local p_throttler = throttler_list[i]
+            Queue.clear(p_throttler.objq)
+            Queue.clear(p_throttler.pedq)
+            Queue.clear(p_throttler.vehq)
+            p_throttler.throttling = false
+            p_throttler.throttle_time = 0
+        end
     end
 end)
 

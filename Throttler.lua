@@ -18,7 +18,6 @@ end
 run_auto_update({source_url=auto_update_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
 
 ------------------- Queue Stuff
--- Queue Linked List
 Queue = {}
 
 function Queue.new()
@@ -80,6 +79,11 @@ local NULL <const> = 0
 
 local BLOCK_CMD <const> = "timeout"
 
+
+
+
+
+
 ------------ Variables ------------
 
 Config = {
@@ -109,11 +113,16 @@ for i=0, 31 do
     throttler_list[i].pid = i
 end
 
-Entity = {handle = NULL, time=0}
+Entity = {handle = NULL, pointer = NULL, time=0}
 
 function Entity.new()
-    return {handle=NULL, time=0}
+    return {handle=NULL, pointer = NULL, time=0}
 end
+
+
+
+
+
 
 ------------ Functions ------------
 
@@ -158,13 +167,13 @@ local function check_list(entities_list, now, type, handles)
 
         local obj_handle = handles ? ent : entities.pointer_to_handle(obj_ptr)
 
-        -- Ignore player modele
+        -- Ignore player model
         if obj_handle == PLAYER.GET_PLAYER_PED(owner_id) then
             continue
         end
 
-        if not table.contains(seen_entities, obj_handle) then
-            table.insert(seen_entities, obj_handle)
+        if not table.contains(seen_entities, obj_ptr) then
+            table.insert(seen_entities, obj_ptr)
             
             local distance = pos:distance(entities.get_position(obj_ptr))
 
@@ -182,7 +191,8 @@ local function check_list(entities_list, now, type, handles)
 
                 local node = Entity.new()
 
-                node.handle = obj_handle
+                -- node.handle = net_id
+                node.pointer = obj_ptr
                 node.time = now
                 
                 local throttler = throttler_list[owner_id]
@@ -195,14 +205,19 @@ local function check_list(entities_list, now, type, handles)
     end
 end
 
-local function cleanup_seen()
+local function cleanup_seen(obj_list, ped_list, veh_list)
     local temp = {}
 
     -- Cache indexes of old entities
-    for i, ent in ipairs(seen_entities) do
-        if not ENTITY.DOES_ENTITY_EXIST(ent) then
-            table.insert(temp, i)
+    for i, pointer in ipairs(seen_entities) do
+
+        local obj_handle = entities.pointer_to_handle(pointer)
+
+        if table.contains(obj_list, pointer) or table.contains(ped_list, pointer) or table.contains(veh_list, obj_handle) then
+            continue
         end
+
+        table.insert(temp, i)
     end
 
     -- Remove old entities from Right to Left (prevent index shifting errors)
@@ -255,10 +270,14 @@ local function check_queue(now)
                     if Config[type].cleanup then
                         node = Queue.peek(q)
                         while node ~= nil do
-                            local obj_handle = Queue.pop(q)
-                            entities.delete_by_handle(obj_handle.handle)
+                            local pointer = Queue.pop(q).pointer
+
+                            if table.contains(seen_entities, pointer) then
+                                entities.delete_by_pointer(pointer)
+                                deleted += 1
+                            end
+
                             node = Queue.peek(q)
-                            deleted += 1
                         end
                     end
 
@@ -278,6 +297,11 @@ local function check_queue(now)
         -- util.draw_debug_text(players.get_name(pid) .. "(" .. tostring(sizes[1]) .. "/" .. tostring(sizes[2]) .. "/" .. tostring(sizes[3]) .. ")")
     end
 end
+
+
+
+
+
 
 ------------ Menu Setup ------------ 
 menu.toggle_loop(menu.my_root(), "Throttle Objects", {}, "Throttles Objects owned by other players.", 
@@ -300,12 +324,16 @@ function ()
 
     local now = util.now()
 
-    -- 5 Second Grace Period
-    check_list(entities.get_all_objects_as_pointers(), now, 0)
-    check_list(entities.get_all_peds_as_pointers(), now, 1)
-    check_list(entities.get_all_vehicles_as_handles(), now, 2, true)
+    local objects_list = entities.get_all_objects_as_pointers()
+    local ped_list = entities.get_all_peds_as_pointers()
+    local veh_list = entities.get_all_vehicles_as_handles()
 
-    cleanup_seen()
+    -- 5 Second Grace Period
+    check_list(objects_list, now, 0)
+    check_list(ped_list, now, 1)
+    check_list(veh_list, now, 2, true)
+
+    cleanup_seen(objects_list, ped_list, veh_list)
 
     -- Go through player Entity Queues
     check_queue(now)
@@ -326,6 +354,7 @@ menu.slider(menu.my_root(), "Timeout Time", {}, "How long Syncs should be blocke
     timeout_time = (value * 1000)
 end)
 
+-- Setup Each Type
 for type=0, 2 do
     local is_focused = false
 
@@ -375,4 +404,3 @@ for type=0, 2 do
 end
 
 util.keep_running()
-

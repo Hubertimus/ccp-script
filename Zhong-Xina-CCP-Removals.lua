@@ -65,6 +65,8 @@ local WIRI_HOSTILE_CARS = "Trolling & Griefing>Hostile Traffic"
 
 ------------ Variables ------------
 
+Integer = {MIN_VALUE = -2147483648, MAX_VALUE = 2147483647}
+
 local WEAPON_STUNGUN <const> = 1171102963
 local WEAPON_RAYPISTOL <const> = -1355376991
 NULL = 0
@@ -156,8 +158,9 @@ end
 
 -- Jinx Linus Crash Tips
 local function linux_crash_tips(pid)
-    local int_min = -2147483647
-    local int_max = 2147483647
+    local int_min = Integer.MIN_VALUE
+    local int_max = Integer.MAX_VALUE
+
     for i = 1, 150 do
         util.trigger_script_event(1 << pid, {2765370640, pid, 3747643341, math.random(int_min, int_max), math.random(int_min, int_max), 
         math.random(int_min, int_max), math.random(int_min, int_max), math.random(int_min, int_max), math.random(int_min, int_max),
@@ -442,7 +445,9 @@ menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisibl
                 end
 
                 if owner_id ~= -1 then
-                    util.toast("Invisible Object from " .. players.get_name(owner_id))
+                    local model_name = util.reverse_joaat(entities.get_model_hash(pointer))
+                    util.toast("Invisible Object from " .. players.get_name(owner_id) .. " (" .. model_name .. ")")
+                    util.draw_ar_beacon(entities.get_position(pointer))
                 end
             end
         end
@@ -574,15 +579,17 @@ menu.toggle_loop(anti_taser, "Enable", {}, "", function()
 
 		local player_pos = players.get_position(player_id)
 		local distance = player_pos:distance(lp_pos)
-		local timeout_delay = 200 + math.floor(distance * 0.015 * 1000) -- if dist is 13.4128, timeout length = 401ms
+		local timeout_delay = 500 + math.floor(distance * 0.015 * 1000) -- if dist is 13.4128, timeout length = 401ms
 
 		in_timeout[player_name] = 1
-		menu.trigger_commands("ignore" .. player_name .. " on")
+		NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, true)
+        -- menu.trigger_commands("ignore" .. player_name .. " on")
 		toast("Ignoring network events from: " .. player_name .. " for " .. timeout_delay .. "ms")
 
 		util.create_thread(function()
 			util.yield(timeout_delay)
-			menu.trigger_commands("ignore" .. player_name .. " off")
+			NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, false)
+            -- menu.trigger_commands("ignore" .. player_name .. " off")
 			in_timeout[player_name] = nil
 		end)
 	end

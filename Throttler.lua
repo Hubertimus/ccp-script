@@ -250,13 +250,20 @@ local function check_queue(now)
                     util.toast(throttle_type .. " Throttling " .. players.get_name(pid))
                     block_syncs(pid, true)
 
+                    local deleted = 0
+
                     if Config[type].cleanup then
                         node = Queue.peek(q)
                         while node ~= nil do
                             local obj_handle = Queue.pop(q)
                             entities.delete_by_handle(obj_handle.handle)
                             node = Queue.peek(q)
+                            deleted += 1
                         end
+                    end
+
+                    if deleted > 0 then
+                        util.toast("Deleted " .. deleted .. " " .. throttle_type .. "s from " .. players.get_name(pid))
                     end
 
                     break

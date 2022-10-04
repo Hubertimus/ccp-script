@@ -19,59 +19,15 @@ if not status then
 end
 run_auto_update({source_url=auto_update_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
 
-------------------- Queue Stuff
-Queue = {}
+-- Load Queue Library
+async_http.init('raw.githubusercontent.com', '/Hubertimus/ccp-script/main/Queue.lua', function(body)
+    local func, err = load(body)
 
-function Queue.new()
-    return {first = 0, last = -1, data = {}}
-end
-
--- Grab last value in Queue
-function Queue.push(q, value)
-    q.last = q.last + 1
-    q.data[q.last] = value
-end
-
-function Queue.peek(q)
-    if (Queue.empty(q)) then return nil end
-
-    return q.data[q.first]
-end
-
--- Grab first value in Queue
-function Queue.pop(q)
-    if (Queue.empty(q)) then error("Queue is empty") end
-
-    local value = q.data[q.first]
-
-    -- Clear value
-    q.data[q.first] = nil
-
-    -- Increment
-    q.first = q.first + 1
-
-    return value
-end
-
--- Returns size of queue
-function Queue.size(q)
-    return (q.last - q.first) + 1
-end
-
--- Goes through all values and sets to nil
-function Queue.clear(q)
-    while not Queue.empty(q) do
-        Queue.pop(q) -- Ignore return value since we're clearing
+    if not func then
+        util.toast(err)
+        util.stop_script()
     end
-end
-
-function Queue.empty(q)
-    return q.first > q.last
-end
-------------------- Queue Stuff
-
-
-
+end)
 
 
 
@@ -81,6 +37,9 @@ local NULL <const> = 0
 
 local BLOCK_CMD <const> = "timeout"
 
+local OBJS <const> = 0
+local PEDS <const> = 0
+local VEHS <const> = 0
 
 
 
@@ -149,7 +108,7 @@ local function block_syncs(pid, should_block)
     menu.trigger_commands(BLOCK_CMD .. players.get_name(pid) .. (should_block ? " on" : " off"))
 end
 
-local function check_list(entities_list, now, type, veh_list)
+local function check_list(entities_list, now, type)
     local can_track = now - last_ran_ms > 5000
 
     local player = players.user()
@@ -176,7 +135,7 @@ local function check_list(entities_list, now, type, veh_list)
 
                 if type == 2 then
                     local has_ped = false
-                    local handle = veh_list[i]
+                    local handle = entities.pointer_to_handle(obj_ptr)
                     for i=-1, VEHICLE.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS(handle) - 1 do
                         if VEHICLE.GET_PED_IN_VEHICLE_SEAT(handle, i, false) ~= 0 then
                             has_ped = true
@@ -318,21 +277,15 @@ function ()
 
     local now = util.now()
 
-    local objects_list = entities.get_all_objects_as_pointers()
+    local objects_list = merge_table(false, entities.get_all_objects_as_pointers(), entities.get_all_pickups_as_pointers())
     local ped_list = entities.get_all_peds_as_pointers()
-    local veh_list = entities.get_all_vehicles_as_handles()
+    local veh_list = entities.get_all_vehicles_as_pointers()
 
-    local veh_p_list = {}
+    check_list(objects_list, now, OBJS)
+    check_list(ped_list, now, PEDS)
+    check_list(veh_list, now, VEHS)
 
-    for i, veh in ipairs(veh_list) do
-        veh_p_list[i] = entities.handle_to_pointer(veh)
-    end
-
-    check_list(objects_list, now, 0)
-    check_list(ped_list, now, 1)
-    check_list(veh_p_list, now, 2, veh_list)
-
-    cleanup_seen(objects_list, ped_list, veh_p_list)
+    cleanup_seen(objects_list, ped_list, veh_list)
 
     -- Go through player Entity Queues
     check_queue(now)

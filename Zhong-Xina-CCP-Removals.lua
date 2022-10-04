@@ -51,7 +51,8 @@ local JINX_TP_TO_CAYO = "tpcayo"
 local JINX_KICK_FROM_CAYO = "cayokick"
 local JS_ENTITY_STORM = "jsentitystorm"
 
-local JINX_LINUS_CRASH = "Jinx Script>Player Removals>Crashes>Linus Crash Tips"
+-- local JINX_LINUS_CRASH = "Jinx Script>Player Removals>Crashes>Linus Crash Tips"
+local JINX_GLITCH_PLAYER_DELAY = "Jinx Script>Trolling & Griefing>Glitch Player>Spawn Delay"
 local JINX_GLITCH_PLAYER = "Jinx Script>Trolling & Griefing>Glitch Player>Glitch Player"
 local JINX_KILL_GODMODER = "Jinx Script>Anti-Modder>Kill Godmode Player>Squish"
 local JINX_REMOVE_GODMODE = "Jinx Script>Anti-Modder>Remove Player Godmode"
@@ -248,7 +249,9 @@ local function setup_trolling(utils, player_id)
     
     -- Glitch Player
     menu.action(trolling, "Toggle Glitch Player", {}, "", function()
+        local delay = menu.ref_by_rel_path(player_root, JINX_GLITCH_PLAYER_DELAY)
         local cmd = menu.ref_by_rel_path(player_root, JINX_GLITCH_PLAYER)
+        menu.trigger_command(delay, "0")
         menu.trigger_command(cmd, "")
     end)
 
@@ -305,7 +308,7 @@ local function setup_removals(anchor, player_id)
     -- Check if the user is Zack
     local is_broke = menu.get_edition() < REGULAR
 
-    local player_root = menu.player_root(player_id)
+    -- local player_root = menu.player_root(player_id)
 
     -- Check if Jinx Script Linus crash exists
     local root = menu.attach_before(anchor, menu.list(shadow_root, "Uyghur Muslim Removals"))
@@ -399,7 +402,7 @@ On_join = function(player_id)
 
         setup_trolling(utils, player_id)
 
-        menu.attach_before(anchor, menu.divider(shadow_root, "Player Options"))
+        menu.attach_before(anchor, menu.divider(shadow_root, players.get_name(player_id)))
     end
 end
 ------------ End Functions ------------
@@ -456,11 +459,17 @@ menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisibl
             end
         end
 
-        for _, h_vehicle in ipairs(entities.get_all_vehicles_as_handles()) do
+        for _, pointer in ipairs(entities.get_all_vehicles_as_pointers()) do
             -- Ignore our own networked entities
-            local owner_id = get_entity_owner(h_vehicle)
+            local owner_id = entity_owner_from_pointer(pointer)
 
-            if  owner_id == -1 or owner_id == players.user() or NETWORK.NETWORK_HAS_CONTROL_OF_ENTITY(h_vehicle) then
+            if  owner_id == -1 or owner_id == players.user() then
+                continue
+            end
+
+            local h_vehicle = entities.pointer_to_handle(pointer)
+            -- Ignore our own networked entities
+            if NETWORK.NETWORK_HAS_CONTROL_OF_ENTITY(h_vehicle) then
                 continue
             end
 

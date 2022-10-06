@@ -92,13 +92,6 @@ function util.now()
     return util.current_time_millis()
 end
 
-local function concat_table(t1, t2)
-    for i=1,#t2 do
-        t1[#t1+1] = t2[i]
-    end
-    return t1
-end
-
 -- Gets ID of who owns entity
 local function entity_owner_from_pointer(entityPointer)
     local net_object = memory.read_long(entityPointer + 0xD0)
@@ -284,7 +277,7 @@ function ()
 
     local now = util.now()
 
-    local objects_list = concat_table(entities.get_all_objects_as_pointers(), entities.get_all_pickups_as_pointers())
+    local objects_list = table.concat(entities.get_all_objects_as_pointers(), entities.get_all_pickups_as_pointers())
     local ped_list = entities.get_all_peds_as_pointers()
     local veh_list = entities.get_all_vehicles_as_pointers()
 

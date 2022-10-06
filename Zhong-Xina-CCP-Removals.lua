@@ -350,7 +350,7 @@ local function setup_removals(anchor, player_id)
     -- local player_root = menu.player_root(player_id)
 
     -- Check if Jinx Script Linus crash exists
-    local root = anchor:attach_before(shadow_root:list("Uyghur Muslim Removals"))
+    local root = anchor:attachBefore(shadow_root:list("Uyghur Muslim Removals"))
 
     -- Add the option to explicitly Breakup Kick
     if not is_broke then
@@ -427,13 +427,13 @@ On_join = function(player_id)
         setup_removals(anchor, player_id)
 
         local utils = shadow_root:list("Player Shortcuts")
-        utils = anchor:attach_before(utils)
+        utils = anchor:attachBefore(utils)
 
         setup_utils(utils, player_id)
 
         setup_trolling(utils, player_id)
 
-        anchor:attach_before(shadow_root:divider(players.get_name(player_id)))
+        anchor:attachBefore(shadow_root:divider(players.get_name(player_id)))
     end
 end
 

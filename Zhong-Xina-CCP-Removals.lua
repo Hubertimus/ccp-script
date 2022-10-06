@@ -84,8 +84,9 @@ local interior_stuff = {0, 233985, 169473, 169729, 169985, 170241, 177665, 17740
 local ghosted_table = {}
 
 local xenophobia_enabled
+local note_player
 
-local languages = {
+local languages <const> = {
     [0] = { lang = "English", block = false },
     [1] = { lang = "French", block = false },
     [2] = { lang = "German", block = false },
@@ -105,6 +106,12 @@ local show_notification = false
 local anti_stun_gun = false
 local anti_atomizer = false
 local in_timeout = {}
+
+local menu_root = menu.my_root()
+local xeno_root = menu_root:list("Xenophobia")
+local list = xeno_root:list("Kick Languages")
+local kicked_players_menu = xeno_root:list("Kicked players", {}, "List of players you've kicked")
+local kicked_players = {}
 
 ------------ End Variables ------------
 
@@ -132,7 +139,7 @@ end
 
 -- Jinx Function
 local function player_toggle_loop(root, pid, menu_name, command_names, help_text, callback)
-    return menu.toggle_loop(root, menu_name, command_names, help_text, function()
+    return root:toggle_loop(menu_name, command_names, help_text, function()
         if (not is_connected() or not players.exists(pid)) then util.stop_thread() end
         callback()
     end)
@@ -204,33 +211,65 @@ local function toast(...)
 	end
 end
 
+local function player_handler(player_id)
+    local name = players.get_name(player_id)
+    local player_lang = languages[players.get_language(player_id)] or {}
+
+    if not player_lang.block then
+        return
+    end
+
+    if note_player then
+        menu.trigger_commands("historynote" .. name .. " " .. "3rd worlders")
+    end
+
+    block_player(player_id, false)
+    util.toast("Kicking " .. player_lang.lang .. " Player " .. name)
+    menu.trigger_commands(SMART_KICK .. name)
+
+    kicked_players[name] = {
+        lang = player_lang.lang,
+        menu = kicked_players_menu:action(name, {}, string.format("Language: %s\nStill In Lobby?: Yes", player_lang.lang), function() end)
+    }
+end
+
+local function player_leave_handler(player_id, name)
+    local player = kicked_players[name]
+
+    if not player then
+        return
+    end
+
+    menu.set_help_text(player.menu, string.format("Language: %s\nStill In Lobby?: No", player.lang))
+end
+
 -- Script Setup Functions
 local function setup_utils(utils, player_id)
     local player_root = menu.player_root(player_id)
 
     -- Spectate Toggle Shortcut
-    menu.action(utils, "Toggle Spectate", {}, "Toggles Ninja Method Spectate", function ()
+    utils:action("Toggle Spectate", {}, "Toggles Ninja Method Spectate", function ()
         local cmd = menu.ref_by_rel_path(player_root, SPECTATE_NINJA)
         menu.trigger_command(cmd, "")
     end)
 
     -- Teleport Shortcut
-    menu.action(utils, "Teleport to Player", {}, "Teleports", function ()
+    utils:action("Teleport to Player", {}, "Teleports", function ()
         menu.trigger_commands(TELEPORT_TO .. players.get_name(player_id))
     end)
 
     -- Blacklist on Join
-    menu.action(utils, "Blacklist Player", {}, "", function()
+    utils:action("Blacklist Player", {}, "", function()
         block_player(player_id, true)
     end)
 
-    menu.action(utils, "Remove Ghost", {}, "", function ()
+    utils:action("Remove Ghost", {}, "", function ()
         NETWORK._SET_RELATIONSHIP_TO_PLAYER(player_id, false)
         ghosted_table[player_id] = false
     end)
 
     -- Removals Shortcut
-    menu.action(utils, "Go To Removals", {}, "", function()
+    utils:action("Go To Removals", {}, "", function()
         menu.trigger_command(menu.ref_by_rel_path(player_root, "Uyghur Muslim Removals"))
     end)
 end
@@ -240,15 +279,15 @@ local function setup_trolling(utils, player_id)
     local player_root = menu.player_root(player_id)
 
     -- Trolling Shortcuts
-    local trolling = menu.list(utils, "Troll/Grief Shortcuts")
+    local trolling = utils:list("Troll/Grief Shortcuts")
 
     -- Entity Storm
-    menu.action(trolling, "Toggle Entity Storm", {}, "", function()
+    trolling:action("Toggle Entity Storm", {}, "", function()
         menu.trigger_commands(JS_ENTITY_STORM .. players.get_name(player_id))
     end)
     
     -- Glitch Player
-    menu.action(trolling, "Toggle Glitch Player", {}, "", function()
+    trolling:action("Toggle Glitch Player", {}, "", function()
         local delay = menu.ref_by_rel_path(player_root, JINX_GLITCH_PLAYER_DELAY)
         local cmd = menu.ref_by_rel_path(player_root, JINX_GLITCH_PLAYER)
         menu.trigger_command(delay, "0")
@@ -256,7 +295,7 @@ local function setup_trolling(utils, player_id)
     end)
 
     -- Glitch Vehicle
-    menu.action(trolling, "Toggle Glitch Vehicle", {}, "", function()
+    trolling:action("Toggle Glitch Vehicle", {}, "", function()
         menu.trigger_commands(JINX_GLITCH_VEHICLE .. players.get_name(player_id))
     end)
 
@@ -275,30 +314,30 @@ local function setup_trolling(utils, player_id)
     end)
 
     -- Hostile Cars
-    menu.action(trolling, "Toggle Hostile Cars", {}, "", function()
+    trolling:action("Toggle Hostile Cars", {}, "", function()
         local cmd = menu.ref_by_rel_path(player_root, WIRI_HOSTILE_CARS)
         menu.trigger_command(cmd, "")
     end)
 
     -- Remove God
-    menu.action(trolling, "Remove Godmode", {}, "", function ()
+    trolling:action("Remove Godmode", {}, "", function ()
         local cmd = menu.ref_by_rel_path(player_root, JINX_REMOVE_GODMODE)
         menu.trigger_command(cmd)
     end)
 
     -- Kill God Mode
-    menu.action(trolling, "Kill Godmode Squish", {}, "", function()
+    trolling:action("Kill Godmode Squish", {}, "", function()
         local cmd = menu.ref_by_rel_path(player_root, JINX_KILL_GODMODER)
         menu.trigger_command(cmd, "Khanjali")
     end)
 
     -- Teleport to Cayo
-    menu.action(trolling, "Teleport to Cayo", {}, "Even better if you hold down key", function()
+    trolling:action("Teleport to Cayo", {}, "Even better if you hold down key", function()
         menu.trigger_commands(JINX_TP_TO_CAYO .. players.get_name(player_id))
     end)
 
     -- Kicked from Cayo
-    menu.action(trolling, "Kick from Cayo", {}, "", function()
+    trolling:action("Kick from Cayo", {}, "", function()
         menu.trigger_commands(JINX_KICK_FROM_CAYO .. players.get_name(player_id))
     end)
 end
@@ -311,24 +350,24 @@ local function setup_removals(anchor, player_id)
     -- local player_root = menu.player_root(player_id)
 
     -- Check if Jinx Script Linus crash exists
-    local root = menu.attach_before(anchor, menu.list(shadow_root, "Uyghur Muslim Removals"))
+    local root = anchor:attach_before(shadow_root:list("Uyghur Muslim Removals"))
 
     -- Add the option to explicitly Breakup Kick
     if not is_broke then
-        menu.action(root, "Breakup Kick", {}, "You're not broke!", function() 
+        root:action("Breakup Kick", {}, "You're not broke!", function() 
             block_player(player_id, false)
             menu.trigger_commands(BREAKUP_KICK .. players.get_name(player_id))
         end)
     end
 
     -- Use Stand Smart Kick
-    menu.action(root, "Smart Kick", {}, "Stands Built-in Smart kick.", function ()
+    root:action("Smart Kick", {}, "Stands Built-in Smart kick.", function ()
         block_player(player_id, false)
         menu.trigger_commands(SMART_KICK .. players.get_name(player_id))
     end)
 
     -- Crashes 
-    menu.action(root, "Smart Crash", {}, "Uses Vehicle Manslaughter if they are in a vehicle.", function ()
+    root:action("Smart Crash", {}, "Uses Vehicle Manslaughter if they are in a vehicle.", function ()
         local player_name = players.get_name(player_id)
         block_player(player_id, false)
 
@@ -345,12 +384,12 @@ local function setup_removals(anchor, player_id)
     end)
 
     -- Jinx Linus Crash
-    menu.action(root, "Linus Crash", {}, "", function ()
+    root:action("Linus Crash", {}, "", function ()
         linux_crash_tips(player_id)
     end)
 
     -- Crash then Kick the player to guarantee removal
-    menu.action(root, "By Any Means Neccessary", {}, "Attempts to Crash the player then Kick.\n(Note) This may backfire on good menus.", function() 
+    root:action("By Any Means Neccessary", {}, "Attempts to Crash the player then Kick.\n(Note) This may backfire on good menus.", function() 
         local player_name = players.get_name(player_id)
         util.toast("Attempting to remove " .. player_name)
         block_player(player_id, true)
@@ -374,20 +413,12 @@ local function setup_removals(anchor, player_id)
     end)
 end
 
-local function handle_xenophobia(player_id)
-    local lang = languages[players.get_language(player_id)]
-    if xenophobia_enabled and lang.block then
-        local name = players.get_name(player_id)
-        util.toast("Kicking " .. lang.lang .. " Player " .. name)
-        block_player(player_id, false)
-        menu.trigger_commands(SMART_KICK .. name)
-    end
-end
-
 -- on_join callback
 On_join = function(player_id)
     -- If not ourselves, construct options
     if player_id ~= players.user() then
+        if xenophobia_enabled then player_handler(player_id) end
+
         local player_root = menu.player_root(player_id)
 
         -- Create a Divider
@@ -395,15 +426,21 @@ On_join = function(player_id)
 
         setup_removals(anchor, player_id)
 
-        local utils = menu.list(shadow_root, "Player Shortcuts")
-        utils = menu.attach_before(anchor, utils)
+        local utils = shadow_root:list("Player Shortcuts")
+        utils = anchor:attach_before(utils)
 
         setup_utils(utils, player_id)
 
         setup_trolling(utils, player_id)
 
-        menu.attach_before(anchor, menu.divider(shadow_root, players.get_name(player_id)))
+        anchor:attach_before(shadow_root:divider(players.get_name(player_id)))
     end
+end
+
+On_leave = function (player_id)
+    if xenophobia_enabled then player_leave_handler(player_id) end
+
+    ghosted_table[player_id] = false
 end
 ------------ End Functions ------------
 
@@ -414,19 +451,19 @@ end
 ------------ Script Menu Setup ------------
 
 -- Shortcut to Players Tab
-menu.action(menu.my_root(), "Players Tab", {}, "Goes to players tab", function()
+menu_root:action("Players Tab", {}, "Goes to players tab", function()
     menu.trigger_command(menu.ref_by_path("Players"))
 end)
 
 -- Auto Block Join
-menu.toggle(menu.my_root(), "Auto Join Reaction", {}, "Automatically sets block join reaction when you kick/crash.", function (on, click_type)
+menu_root:toggle("Auto Join Reaction", {}, "Automatically sets block join reaction when you kick/crash.", function (on, click_type)
     block_joins = on
 end)
 
-local protections_tab = menu.list(menu.my_root(), "Protections")
+local protections_tab = menu_root:list("Protections")
 
 -- Anti Invisible Entity
-menu.toggle_loop(protections_tab, "Show Invisible Entities", {}, "Makes invisible entities transparent instead.", function (on, click_type)
+protections_tab:toggle_loop("Show Invisible Entities", {}, "Makes invisible entities transparent instead.", function (on, click_type)
     if is_connected() then
         for _, pointer in ipairs(entities.get_all_objects_as_pointers()) do
             local owner_id = entity_owner_from_pointer(pointer)
@@ -495,13 +532,8 @@ for i=0, 31 do
     ghosted_table[i] = false
 end
 
--- Set to false
-On_leave = function (player_id)
-    ghosted_table[player_id] = false
-end
-
 -- Auto Ghost Godemoder but better
-menu.toggle_loop(protections_tab, "Auto Ghost Godmoders", {}, "Better than Jinx", 
+protections_tab:toggle_loop("Auto Ghost Godmoders", {}, "Better than Jinx", 
 -- on_tick
 function()
     if is_connected() then
@@ -543,21 +575,21 @@ function ()
 end)
 
 -- Zack Moment
-local anti_taser = menu.list(protections_tab, "Anti Stunomizer")
+local anti_taser = protections_tab:list("Anti Stunomizer")
 
-menu.toggle(anti_taser, "Show Notification", {}, "Shows notification of when the player gets event blocked", function(state)
+anti_taser:toggle("Show Notification", {}, "Shows notification of when the player gets event blocked", function(state)
 	show_notification = state
 end)
 
-menu.toggle(anti_taser, "Anti Stun Gun", {"antitaser"}, "Stops players from stunning you with the stun gun", function(state)
+anti_taser:toggle("Anti Stun Gun", {"antitaser"}, "Stops players from stunning you with the stun gun", function(state)
 	anti_stun_gun = state
 end)
 
-menu.toggle(anti_taser, "Anti Up-N-Atomizer", {"antiupnatomizer"}, "Stops players from shooting you with the Up-N-Atomizer", function(state)
+anti_taser:toggle("Anti Up-N-Atomizer", {"antiupnatomizer"}, "Stops players from shooting you with the Up-N-Atomizer", function(state)
 	anti_atomizer = state
 end)
 
-menu.toggle_loop(anti_taser, "Enable", {}, "", function()
+anti_taser:toggle_loop("Enable", {}, "", function()
 	if not anti_stun_gun and not anti_atomizer then
 		return -- If you don't have the features enabled, stop here
 	end
@@ -613,64 +645,29 @@ menu.toggle_loop(anti_taser, "Enable", {}, "", function()
 	end
 end)
 
--- local xenophobia_list = false
+for i=0, #languages do
+    local lang = languages[i]
+    list:toggle(lang.lang, {}, "", function(state)
+        lang.block = state
+    end, lang.block)
+end
 
--- local function setup_xenophobia()
---     xenophobia_list = menu.list(menu.my_root(), "Kick Languages")
---     for i, v in ipairs(languages) do
---         menu.toggle(xenophobia_list, v.lang, {}, "", function(enabled)
---             languages[i].block = enabled
---         end, v.block)
---     end
+xeno_root:toggle("Add note", {}, "Notes player as '3rd worlder'", function(state)
+    note_player = state
+end)
 
---     util.create_thread(function ()
---         if is_connected() and xenophobia_enabled then
---             for _, player_id in ipairs(players.list(false, false, true)) do
---                 handle_xenophobia(player_id)
---             end
---             util.yield(100)
---         else
---             return
---         end
---         -- Execute 10 times/sec
---     end)
--- end
+xeno_root:toggle("Enable", {}, "Kicks Players based off of Language settings\n(On Join)", function(state)
+    xenophobia_enabled = state
+end)
 
--- -- Xenophobia Setup
--- menu.toggle(menu.my_root(), "Xenophobia", {}, "Kicks Players based off of Language settings\n(On Join)", function(enabled)
---     xenophobia_enabled = enabled
+local check_lobby;
+check_lobby = xeno_root:action("Check Lobby", {}, "Checks each players language in the current lobby and kicks them if its a blocked language", function()
+    for _, pid in ipairs(players.list(false, false)) do
+        player_handler(pid)
+    end
 
---     if xenophobia_enabled then
---         setup_xenophobia()
---     else
---         if xenophobia_list ~= NULL then
---             menu.delete(xenophobia_list)
---         end
---     end
--- end)
-
--- menu.toggle_loop(protections_tab, "Anti Vehicle Trolling", {}, "Removes any invisible entities in your vehicle.", function () 
---     if is_connected() then
---         local h_vehicle = entities.get_user_vehicle_as_handle()
---         for i=-1, VEHICLE.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS(h_vehicle) - 1 do
---             local h_ped = VEHICLE.GET_PED_IN_VEHICLE_SEAT(h_vehicle, i, false)
-
---             if h_ped == NULL or h_ped == players.user_ped() or PED.IS_PED_A_PLAYER(h_ped) then
---                 continue
---             end
-
---             if not NETWORK.NETWORK_HAS_CONTROL_OF_ENTITY(h_ped) then
---                 entities.delete_by_handle(h_ped)
---             end
-            
---         end
---     end
--- end)
-
--- menu.toggle(menu.my_root(), "Auto Script Host", {"ccpautosh"}, "Automatically sets you as script host.", function(on, click_type)
---     if players.get_script_host() ~= players.user() then
---     end
--- end)
+    check_lobby:delete()
+end)
 ------------ End Script Menu Setup ------------
 
 

@@ -38,8 +38,8 @@ local NULL <const> = 0
 local BLOCK_CMD <const> = "timeout"
 
 local OBJS <const> = 0
-local PEDS <const> = 0
-local VEHS <const> = 0
+local PEDS <const> = 1
+local VEHS <const> = 2
 
 
 
@@ -48,9 +48,9 @@ local VEHS <const> = 0
 ------------ Variables ------------
 
 Config = {
-    [0] = {enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000}, -- Obj
-    {enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000}, -- Ped
-    {enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000} -- Veh
+    [0] = {type="Object", enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000}, -- Obj
+    {type="Ped", enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000}, -- Ped
+    {type="Vehicle", enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000} -- Veh
 }
 
 local seen_entities = {}
@@ -66,17 +66,22 @@ local timeout_time = 30000
 PlayerThrottler = {}
 
 function PlayerThrottler.new()
-    return {pid = -1, throttling = false, throttle_time = 0, vehq = Queue.new(), pedq = Queue.new(), objq = Queue.new()}
+    return {pid = -1, throttling = false, throttle_time = 0, 
+    queues = {
+        [OBJS] = Queue.new(), -- Obj Queue
+        [PEDS] = Queue.new(), -- Ped Queue
+        [VEHS] = Queue.new()  -- Veh Queue
+    }}
 end
 
 for i=0, 31 do
     throttler_list[i] = PlayerThrottler.new()
-    throttler_list[i].pid = i
+    throttler_list[i].pid = i -- Don't think this is neccessary
 end
 
-Entity = {handle = NULL, pointer = NULL, time=0}
+SpawnedEntity = {handle=NULL, pointer = NULL, time=0}
 
-function Entity.new()
+function SpawnedEntity.new()
     return {handle=NULL, pointer = NULL, time=0}
 end
 
@@ -133,7 +138,7 @@ local function check_list(entities_list, now, type)
 
             if can_track and distance <= Config[type].radius then
 
-                if type == 2 then
+                if type == VEHS then
                     local has_ped = false
                     local handle = entities.pointer_to_handle(obj_ptr)
                     for i=-1, VEHICLE.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS(handle) - 1 do
@@ -144,7 +149,7 @@ local function check_list(entities_list, now, type)
                     if has_ped then continue end
                 end
 
-                local node = Entity.new()
+                local node = SpawnedEntity.new()
 
                 -- node.handle = net_id
                 node.pointer = obj_ptr
@@ -152,7 +157,7 @@ local function check_list(entities_list, now, type)
                 
                 local throttler = throttler_list[owner_id]
 
-                local q = type == 0 ? throttler.objq : type == 1 ? throttler.pedq : throttler.vehq
+                local q = throttler.queues[type]
 
                 Queue.push(q, node)
             end
@@ -166,6 +171,8 @@ local function cleanup_seen(obj_list, ped_list, veh_list)
 
     -- Cache indexes of old entities
     for i, pointer in ipairs(seen_entities) do
+
+        -- nice O(n^3) contains
         if table.contains(obj_list, pointer) or table.contains(ped_list, pointer) or table.contains(veh_list, pointer) then
             continue
         end
@@ -188,15 +195,16 @@ local function check_queue(now)
             continue
         end
 
-        local sizes = {0,0,0}
+        -- local sizes = {0,0,0}
 
         for type=0, 2 do
             local throttler = throttler_list[pid]
 
-            local q = type == 0 ? throttler.objq : type == 1 ? throttler.pedq : throttler.vehq
+            local q = throttler.queues[type]
     
-            local throttle_type = type == 0 ? "Object" : type == 1 ? "Ped" : "Vehicle"
+            local throttle_type = Config[type].name
             
+            -- Clear items outside of time limit
             local node = Queue.peek(q)
             while node ~= nil and (now - node.time >= Config[type].time_limit) do
                 Queue.pop(q)
@@ -205,7 +213,7 @@ local function check_queue(now)
 
             local size = Queue.size(q)
 
-            sizes[type + 1] = size
+            -- sizes[type + 1] = size
     
             -- local sync_state = menu.ref_by_rel_path(menu.player_root(pid), "Incoming Syncs>Block")
     
@@ -312,7 +320,7 @@ end)
 for type=0, 2 do
     local is_focused = false
 
-    local throttle_type = type == 0 ? "Objects" : type == 1 ? "Peds" : "Vehicles"
+    local throttle_type = Config[type].name .. "s"
 
     local config = Config[type]
 

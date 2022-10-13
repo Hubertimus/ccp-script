@@ -1,6 +1,6 @@
 NetObject = {}
 
--- Could not find
+-- Could not find where offset came from
 function NetObject.get_net_obj(entity_pointer) 
     return memory.read_long(entity_pointer + 0xD0)
 end
@@ -36,20 +36,20 @@ end
 
 -- bool m_is_remote; //0x004C
 function NetObject.is_remote(net_object)
-    return memory.read_ubyte(net_object + 0x4C) == 1
+    return memory.read_ubyte(net_object + 0x4C) ~= 0
 end
 
 -- bool m_wants_to_delete; //0x004D
 function NetObject.wants_to_delete(net_object)
-    return memory.read_ubyte(net_object + 0x4D) == 1
+    return memory.read_ubyte(net_object + 0x4D) ~= 0
 end
 
 -- char pad_004E[1]; //0x004E
 function NetObject.is_high_priority(net_object)
-    return memory.read_ubyte(net_object + 0x4E)== 1
+    return memory.read_ubyte(net_object + 0x4E) ~= 0
 end
 
 -- bool m_should_not_be_delete; //0x004F
 function NetObject.hould_not_be_delete(net_object)
-    return memory.read_ubyte(net_object + 0x4F) == 1
+    return memory.read_ubyte(net_object + 0x4F) ~= 0
 end

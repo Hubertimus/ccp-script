@@ -1,7 +1,5 @@
--- Natives
-util.require_natives("natives-1663599433")
-
 -- Version 1.0
+util.require_natives("natives-1663599433")
 
 -- Auto Update
 local auto_update_source_url = "https://raw.githubusercontent.com/Hubertimus/ccp-script/main/Throttler.lua"
@@ -29,9 +27,10 @@ async_http.init('raw.githubusercontent.com', '/Hubertimus/ccp-script/main/Queue.
     end
 end)
 
-
-
 ------------ Constants ------------
+
+-- Enable to see entity counts
+local DEBUG <const> = false
 
 local NULL <const> = 0
 
@@ -40,10 +39,6 @@ local BLOCK_CMD <const> = "timeout"
 local OBJS <const> = 0
 local PEDS <const> = 1
 local VEHS <const> = 2
-
-
-
-
 
 ------------ Variables ------------
 
@@ -59,7 +54,7 @@ local throttler_list = {}
 
 local was_connected = false
 
-local last_ran_ms = 0
+local last_dc_ms = 0
 
 local timeout_time = 30000
 
@@ -85,11 +80,6 @@ function SpawnedEntity.new()
     return {handle=NULL, pointer = NULL, time=0}
 end
 
-
-
-
-
-
 ------------ Functions ------------
 
 -- Smaller Function name
@@ -109,12 +99,19 @@ local function is_connected()
     return util.is_session_started() and not util.is_session_transition_active()
 end
 
+-- Enable/Disable Timeout on player (throttling)
 local function block_syncs(pid, should_block)
     menu.trigger_commands(BLOCK_CMD .. players.get_name(pid) .. (should_block ? " on" : " off"))
 end
 
+-- Checks for new entities from players
 local function check_list(entities_list, now, type)
-    local can_track = now - last_ran_ms > 5000
+    -- Should probably not even call this in the first place if disabled
+    if not Config[type].enabled then
+        return
+    end
+
+    local can_track = now - last_dc_ms > 5000
 
     local player = players.user()
 
@@ -166,6 +163,7 @@ local function check_list(entities_list, now, type)
     end
 end
 
+-- Removes entities that no longer exist (can be optimized)
 local function cleanup_seen(obj_list, ped_list, veh_list)
     local temp = {}
 
@@ -188,6 +186,7 @@ local function cleanup_seen(obj_list, ped_list, veh_list)
     temp = nil
 end
 
+-- Checks player queues for entity spam
 local function check_queue(now)
 
     for pid=0, 31 do
@@ -195,7 +194,7 @@ local function check_queue(now)
             continue
         end
 
-        -- local sizes = {0,0,0}
+        local sizes = {0,0,0}
 
         for type=0, 2 do
             local throttler = throttler_list[pid]
@@ -213,14 +212,10 @@ local function check_queue(now)
 
             local size = Queue.size(q)
 
-            -- sizes[type + 1] = size
-    
-            -- local sync_state = menu.ref_by_rel_path(menu.player_root(pid), "Incoming Syncs>Block")
-    
-            -- util.draw_debug_text(players.get_name(pid) .. " (" .. size .. ") " .. tostring(sync_state.value))
+            sizes[type + 1] = size
 
             if not throttler.throttling then
-                if size > Config[type].threshold then
+                if Config[type].enabled and size > Config[type].threshold then
                     throttler.throttling = true
                     throttler.throttle_time = now
                     util.toast(throttle_type .. " Throttling " .. players.get_name(pid))
@@ -255,14 +250,11 @@ local function check_queue(now)
             end
         end
 
-        -- util.draw_debug_text(players.get_name(pid) .. "(" .. tostring(sizes[1]) .. "/" .. tostring(sizes[2]) .. "/" .. tostring(sizes[3]) .. ")")
+        if DEBUG then
+            util.draw_debug_text(players.get_name(pid) .. "(" .. tostring(sizes[1]) .. "/" .. tostring(sizes[2]) .. "/" .. tostring(sizes[3]) .. ")")
+        end
     end
 end
-
-
-
-
-
 
 ------------ Menu Setup ------------ 
 menu.toggle_loop(menu.my_root(), "Enable Throttler", {}, "Throttles Objects owned by other players.", 
@@ -277,22 +269,25 @@ function ()
         return 
     end
 
+    local now = util.now()
+
     if not was_connected then
-        last_ran_ms = util.now()
+        last_dc_ms = now
     end
 
     was_connected = true
 
-    local now = util.now()
-
+    -- Get all of the entities
     local objects_list = table.concat(entities.get_all_objects_as_pointers(), entities.get_all_pickups_as_pointers())
     local ped_list = entities.get_all_peds_as_pointers()
     local veh_list = entities.get_all_vehicles_as_pointers()
 
+    -- Check each type
     check_list(objects_list, now, OBJS)
     check_list(ped_list, now, PEDS)
     check_list(veh_list, now, VEHS)
 
+    -- Remove seen entities that no longer exist
     cleanup_seen(objects_list, ped_list, veh_list)
 
     -- Go through player Entity Queues

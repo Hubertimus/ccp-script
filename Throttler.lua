@@ -18,14 +18,23 @@ end
 run_auto_update({source_url=auto_update_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
 
 -- Load Queue Library
+local wait = true
+
 async_http.init('raw.githubusercontent.com', '/Hubertimus/ccp-script/main/Queue.lua', function(body)
     local func, err = load(body)
-
+    wait = false
     if not func then
         util.toast(err)
         util.stop_script()
+    else
+        func()
     end
 end)
+async_http.dispatch()
+
+while wait do
+    util.yield()
+end
 
 ------------ Constants ------------
 
@@ -40,16 +49,21 @@ local OBJS <const> = 0
 local PEDS <const> = 1
 local VEHS <const> = 2
 
+local ROOT <const> = menu.my_root()
+
 ------------ Variables ------------
 
 Config = {
-    [0] = {type="Object", enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000}, -- Obj
-    {type="Ped", enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000}, -- Ped
-    {type="Vehicle", enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000} -- Veh
+    [0] = {name="Object", enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000}, -- Obj
+    {name="Ped", enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000}, -- Ped
+    {name="Vehicle", enabled = false, cleanup = false, radius = 10, threshold = 10, time_limit = 3000} -- Veh
 }
 
 local seen_entities = {}
+-- Could track types with seen_entities but rather use table.contains(t, ptr)
+local seen_entities_types = {}
 
+-- Throttler list for each player
 local throttler_list = {}
 
 local was_connected = false
@@ -85,6 +99,14 @@ end
 -- Smaller Function name
 function util.now()
     return util.current_time_millis()
+end
+
+-- Add two tables together
+local function concat_table(t1, t2)
+    for i=1,#t2 do
+        t1[#t1+1] = t2[i]
+    end
+    return t1
 end
 
 -- Gets ID of who owns entity
@@ -130,10 +152,10 @@ local function check_list(entities_list, now, type)
 
         if not table.contains(seen_entities, obj_ptr) then
             table.insert(seen_entities, obj_ptr)
+            table.insert(seen_entities_types, type)
             
-            local distance = pos:distance(entities.get_position(obj_ptr))
-
-            if can_track and distance <= Config[type].radius then
+            -- If grace period over and distance <= radius
+            if can_track and pos:distance(entities.get_position(obj_ptr)) <= Config[type].radius then
 
                 if type == VEHS then
                     local has_ped = false
@@ -163,15 +185,16 @@ local function check_list(entities_list, now, type)
     end
 end
 
--- Removes entities that no longer exist (can be optimized)
-local function cleanup_seen(obj_list, ped_list, veh_list)
+-- Removes entities that no longer exist
+local function cleanup_seen(tables)
     local temp = {}
 
-    -- Cache indexes of old entities
+    -- Check if seen entities still exist
     for i, pointer in ipairs(seen_entities) do
 
-        -- nice O(n^3) contains
-        if table.contains(obj_list, pointer) or table.contains(ped_list, pointer) or table.contains(veh_list, pointer) then
+        local type = seen_entities_types[i]
+
+        if table.contains(tables[type], pointer) then
             continue
         end
 
@@ -181,6 +204,7 @@ local function cleanup_seen(obj_list, ped_list, veh_list)
     -- Remove old entities from Right to Left (prevent index shifting errors)
     for i=#temp, 1, -1 do
         table.remove(seen_entities, temp[i])
+        table.remove(seen_entities_types, temp[i])
     end
 
     temp = nil
@@ -257,7 +281,7 @@ local function check_queue(now)
 end
 
 ------------ Menu Setup ------------ 
-menu.toggle_loop(menu.my_root(), "Enable Throttler", {}, "Throttles Objects owned by other players.", 
+ROOT:toggle_loop("Enable Throttler", {}, "Throttles Objects owned by other players.", 
 function ()
     -- Check if we're online and connected
     if not is_connected() then 
@@ -278,7 +302,7 @@ function ()
     was_connected = true
 
     -- Get all of the entities
-    local objects_list = table.concat(entities.get_all_objects_as_pointers(), entities.get_all_pickups_as_pointers())
+    local objects_list = concat_table(entities.get_all_objects_as_pointers(), entities.get_all_pickups_as_pointers())
     local ped_list = entities.get_all_peds_as_pointers()
     local veh_list = entities.get_all_vehicles_as_pointers()
 
@@ -288,7 +312,7 @@ function ()
     check_list(veh_list, now, VEHS)
 
     -- Remove seen entities that no longer exist
-    cleanup_seen(objects_list, ped_list, veh_list)
+    cleanup_seen({objects_list, ped_list, veh_list})
 
     -- Go through player Entity Queues
     check_queue(now)
@@ -298,16 +322,17 @@ function()
         seen_entities = {}
         for i=0, 31 do
             local p_throttler = throttler_list[i]
-            Queue.clear(p_throttler.objq)
-            Queue.clear(p_throttler.pedq)
-            Queue.clear(p_throttler.vehq)
+            local queues = p_throttler.queues
+            -- Clear Queues
+            for j=0, 2 do Queue.clear(queues[j]) end
+
             p_throttler.throttling = false
             p_throttler.throttle_time = 0
         end
     end
 end)
 
-menu.slider(menu.my_root(), "Timeout Time", {}, "How long Syncs should be blocked from the player.", 1, 60, 30, 1, function (value)
+ROOT:slider("Timeout Time", {}, "How long Syncs should be blocked from the player.", 1, 60, 30, 1, function (value)
     timeout_time = (value * 1000)
 end)
 
@@ -319,25 +344,25 @@ for type=0, 2 do
 
     local config = Config[type]
 
-    local type_root = menu.list(menu.my_root(), "Throttle " .. throttle_type)
+    local type_root = ROOT:list("Throttle " .. throttle_type)
 
-    menu.toggle(type_root, "Enabled", {}, "", function (enabled)
+    type_root:toggle("Enabled", {}, "", function (enabled)
         config.enabled = enabled
     end)
 
-    menu.toggle(type_root, "Cleanup", {}, "Delets spammed entities.", function (enabled)
+    type_root:toggle("Cleanup", {}, "Delets spammed entities.", function (enabled)
         config.cleanup = enabled
     end)
 
-    local rad_slider = menu.slider(type_root, "Radius", {}, "", 1, 50, 10, 1, function (value, prev_value, click_type)
+    local rad_slider = type_root:slider("Radius", {}, "", 1, 50, 10, 1, function (value, prev_value, click_type)
         config.radius = value
     end)
     
-    menu.slider(type_root, "Threshold", {}, "How many entities within the time limit", 1, 100, 10, 1, function (value, prev_value, click_type) 
+    type_root:slider("Threshold", {}, "How many entities within the time limit", 1, 100, 10, 1, function (value, prev_value, click_type) 
         config.threshold = value
     end)
 
-    menu.slider(type_root, "Time Limit", {}, "", 1, 10, 3, 1, function (value, prev_value, click_type) 
+    type_root:slider("Time Limit", {}, "", 1, 10, 3, 1, function (value, prev_value, click_type) 
         config.time_limit = (value * 1000)
     end)
 

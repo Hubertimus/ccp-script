@@ -312,7 +312,7 @@ function ()
     check_list(veh_list, now, VEHS)
 
     -- Remove seen entities that no longer exist
-    cleanup_seen({objects_list, ped_list, veh_list})
+    cleanup_seen({[OBJS] = objects_list, [PEDS] = ped_list, [VEHS] = veh_list})
 
     -- Go through player Entity Queues
     check_queue(now)

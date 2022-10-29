@@ -32,9 +32,13 @@ async_http.init('raw.githubusercontent.com', '/Hubertimus/ccp-script/main/Queue.
 end)
 async_http.dispatch()
 
+local loading = menu.my_root():readonly("Loading Queue Library...")
+
 while wait do
     util.yield()
 end
+
+loading:delete()
 
 ------------ Constants ------------
 
@@ -150,6 +154,7 @@ local function check_list(entities_list, now, type)
             continue
         end
 
+        -- No on clone create :(
         if not table.contains(seen_entities, obj_ptr) then
             table.insert(seen_entities, obj_ptr)
             table.insert(seen_entities_types, type)

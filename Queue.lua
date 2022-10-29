@@ -1,23 +1,25 @@
 ------------------- Queue Stuff
 Queue = {}
 
+-- Create a Queue
 function Queue.new()
     return {first = 0, last = -1, data = {}}
 end
 
--- Grab last value in Queue
+-- Puts value to the end of the Queue
 function Queue.push(q, value)
     q.last = q.last + 1
     q.data[q.last] = value
 end
 
+-- Grab the first value in Queue
 function Queue.peek(q)
     if (Queue.empty(q)) then return nil end
 
     return q.data[q.first]
 end
 
--- Grab first value in Queue
+-- Grab the first value in Queue and remove
 function Queue.pop(q)
     if (Queue.empty(q)) then error("Queue is empty") end
 
@@ -44,6 +46,7 @@ function Queue.clear(q)
     end
 end
 
+-- Returns if Queue has no elements
 function Queue.empty(q)
     return q.first > q.last
 end
